@@ -7,101 +7,57 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css">
     <style>
-        body {
-            padding-top: 60px;
-        }
-        .navbar-brand {
-            font-weight: bold;
-        }
-        .stat-card {
-            border-left: 4px solid #0d6efd;
-            transition: transform 0.2s;
-        }
-        .stat-card:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
-        }
-        .stat-value {
-            font-size: 2rem;
-            font-weight: bold;
-            color: #0d6efd;
-        }
-        .badge-expiring {
-            background-color: #ffc107;
-        }
-        .badge-expired {
-            background-color: #dc3545;
-        }
-        .table-hover tbody tr:hover {
-            background-color: #f8f9fa;
-        }
-        .btn-icon {
-            padding: 0.25rem 0.5rem;
-            font-size: 0.875rem;
-        }
+        body { padding-top: 60px; }
+        .navbar-brand { font-weight: bold; }
+        .stat-card { border-left: 4px solid #0d6efd; transition: transform 0.2s; }
+        .stat-card:hover { transform: translateY(-5px); box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
+        .stat-value { font-size: 2rem; font-weight: bold; color: #0d6efd; }
+        .table-hover tbody tr:hover { background-color: #f8f9fa; }
+        .btn-icon { padding: 0.25rem 0.5rem; font-size: 0.875rem; }
     </style>
 </head>
 <body>
-    <!-- Navbar -->
     <nav class="navbar navbar-expand-lg navbar-dark bg-primary fixed-top">
         <div class="container-fluid">
-            <a class="navbar-brand" href="#">
-                <i class="bi bi-box-seam"></i> BC Inventory
-            </a>
+            <a class="navbar-brand" href="#"><i class="bi bi-box-seam"></i> BC Inventory</a>
             <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
                 <span class="navbar-toggler-icon"></span>
             </button>
             <div class="collapse navbar-collapse" id="navbarNav">
                 <ul class="navbar-nav">
-                    <li class="nav-item">
-                        <a class="nav-link active" href="#" onclick="showDashboard(); return false;">Dashboard</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="#" onclick="showProducts(); return false;">Products</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="#" onclick="showStock(); return false;">Stock</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="#" onclick="showExpiring(); return false;">Expiring</a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="#" onclick="showLocations(); return false;">Locations</a>
+                    <li class="nav-item"><a class="nav-link active" href="#" onclick="showDashboard(); return false;">Dashboard</a></li>
+                    <li class="nav-item"><a class="nav-link" href="#" onclick="showProducts(); return false;">Products</a></li>
+                    <li class="nav-item"><a class="nav-link" href="#" onclick="showStock(); return false;">Stock</a></li>
+                    <li class="nav-item"><a class="nav-link" href="#" onclick="showExpiring(); return false;">Expiring</a></li>
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle" href="#" id="settingsDropdown" role="button" data-bs-toggle="dropdown">Settings</a>
+                        <ul class="dropdown-menu">
+                            <li><a class="dropdown-item" href="#" onclick="showDepartments(); return false;"><i class="bi bi-tags"></i> Departments</a></li>
+                            <li><a class="dropdown-item" href="#" onclick="showSuppliers(); return false;"><i class="bi bi-truck"></i> Suppliers</a></li>
+                            <li><a class="dropdown-item" href="#" onclick="showLocations(); return false;"><i class="bi bi-geo-alt"></i> Locations</a></li>
+                        </ul>
                     </li>
                 </ul>
             </div>
         </div>
     </nav>
 
-    <!-- Main Container -->
     <div class="container-fluid">
         <!-- Dashboard View -->
         <div id="dashboardView" class="view">
             <h2 class="mb-4"><i class="bi bi-speedometer2"></i> Dashboard</h2>
-            
-            <div class="row g-4 mb-4" id="statsCards">
-                <!-- Stats will be loaded here -->
-            </div>
-
+            <div class="row g-4 mb-4" id="statsCards"></div>
             <div class="row">
                 <div class="col-md-6">
                     <div class="card">
-                        <div class="card-header">
-                            <i class="bi bi-exclamation-triangle-fill text-warning"></i> Expiring Soon
-                        </div>
-                        <div class="card-body" id="expiringList">
-                            <p class="text-muted">Loading...</p>
-                        </div>
+                        <div class="card-header"><i class="bi bi-exclamation-triangle-fill text-warning"></i> Expiring Soon</div>
+                        <div class="card-body" id="expiringList"><p class="text-muted">Loading...</p></div>
                     </div>
                 </div>
                 <div class="col-md-6">
                     <div class="card">
-                        <div class="card-header">
-                            <i class="bi bi-clock-history"></i> Recent Activity
-                        </div>
-                        <div class="card-body" id="recentActivity">
-                            <p class="text-muted">Loading...</p>
-                        </div>
+                        <div class="card-header"><i class="bi bi-clock-history"></i> Recent Activity</div>
+                        <div class="card-body" id="recentActivity"><p class="text-muted">Loading...</p></div>
                     </div>
                 </div>
             </div>
@@ -111,11 +67,8 @@
         <div id="productsView" class="view" style="display:none;">
             <div class="d-flex justify-content-between align-items-center mb-4">
                 <h2><i class="bi bi-box"></i> Products</h2>
-                <button class="btn btn-primary" onclick="showAddProductModal()">
-                    <i class="bi bi-plus-circle"></i> Add Product
-                </button>
+                <button class="btn btn-primary" onclick="showAddProductModal()"><i class="bi bi-plus-circle"></i> Add Product</button>
             </div>
-            
             <div class="card">
                 <div class="card-body">
                     <div class="row mb-3">
@@ -126,18 +79,9 @@
                     <div class="table-responsive">
                         <table class="table table-hover">
                             <thead>
-                                <tr>
-                                    <th>Name</th>
-                                    <th>Barcode</th>
-                                    <th>Department</th>
-                                    <th>Items per Case</th>
-                                    <th>Price per Case</th>
-                                    <th>Actions</th>
-                                </tr>
+                                <tr><th>Name</th><th>Barcode</th><th>Department</th><th>Supplier</th><th>Items/Case</th><th>Price/Case</th><th>Actions</th></tr>
                             </thead>
-                            <tbody id="productsTable">
-                                <tr><td colspan="6" class="text-center">Loading...</td></tr>
-                            </tbody>
+                            <tbody id="productsTable"><tr><td colspan="7" class="text-center">Loading...</td></tr></tbody>
                         </table>
                     </div>
                 </div>
@@ -148,29 +92,16 @@
         <div id="stockView" class="view" style="display:none;">
             <div class="d-flex justify-content-between align-items-center mb-4">
                 <h2><i class="bi bi-boxes"></i> Stock Management</h2>
-                <button class="btn btn-primary" onclick="showAddStockModal()">
-                    <i class="bi bi-plus-circle"></i> Add Stock
-                </button>
+                <button class="btn btn-primary" onclick="showAddStockModal()"><i class="bi bi-plus-circle"></i> Add Stock</button>
             </div>
-            
             <div class="card">
                 <div class="card-body">
                     <div class="table-responsive">
                         <table class="table table-hover">
                             <thead>
-                                <tr>
-                                    <th>Product</th>
-                                    <th>Barcode</th>
-                                    <th>Location</th>
-                                    <th>Quantity</th>
-                                    <th>Expiry Date</th>
-                                    <th>Days Until Expiry</th>
-                                    <th>Actions</th>
-                                </tr>
+                                <tr><th>Product</th><th>Barcode</th><th>Location</th><th>Quantity</th><th>Expiry Date</th><th>Days Until Expiry</th><th>Actions</th></tr>
                             </thead>
-                            <tbody id="stockTable">
-                                <tr><td colspan="7" class="text-center">Loading...</td></tr>
-                            </tbody>
+                            <tbody id="stockTable"><tr><td colspan="7" class="text-center">Loading...</td></tr></tbody>
                         </table>
                     </div>
                 </div>
@@ -180,29 +111,55 @@
         <!-- Expiring View -->
         <div id="expiringView" class="view" style="display:none;">
             <h2 class="mb-4"><i class="bi bi-calendar-x text-warning"></i> Expiring Items</h2>
-            
-            <div class="alert alert-warning">
-                <i class="bi bi-info-circle"></i> Items expiring within 7 days
-            </div>
-            
+            <div class="alert alert-warning"><i class="bi bi-info-circle"></i> Items expiring within 7 days</div>
             <div class="card">
                 <div class="card-body">
                     <div class="table-responsive">
                         <table class="table table-hover">
                             <thead>
-                                <tr>
-                                    <th>Product</th>
-                                    <th>Barcode</th>
-                                    <th>Location</th>
-                                    <th>Quantity</th>
-                                    <th>Expiry Date</th>
-                                    <th>Days Left</th>
-                                    <th>Actions</th>
-                                </tr>
+                                <tr><th>Product</th><th>Barcode</th><th>Location</th><th>Quantity</th><th>Expiry Date</th><th>Days Left</th><th>Actions</th></tr>
                             </thead>
-                            <tbody id="expiringTable">
-                                <tr><td colspan="7" class="text-center">Loading...</td></tr>
-                            </tbody>
+                            <tbody id="expiringTable"><tr><td colspan="7" class="text-center">Loading...</td></tr></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Departments View -->
+        <div id="departmentsView" class="view" style="display:none;">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h2><i class="bi bi-tags"></i> Departments</h2>
+                <button class="btn btn-primary" onclick="showAddDepartmentModal()"><i class="bi bi-plus-circle"></i> Add Department</button>
+            </div>
+            <div class="card">
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr><th>Name</th><th>Description</th><th>Created</th><th>Actions</th></tr>
+                            </thead>
+                            <tbody id="departmentsTable"><tr><td colspan="4" class="text-center">Loading...</td></tr></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Suppliers View -->
+        <div id="suppliersView" class="view" style="display:none;">
+            <div class="d-flex justify-content-between align-items-center mb-4">
+                <h2><i class="bi bi-truck"></i> Suppliers</h2>
+                <button class="btn btn-primary" onclick="showAddSupplierModal()"><i class="bi bi-plus-circle"></i> Add Supplier</button>
+            </div>
+            <div class="card">
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr><th>Name</th><th>Contact</th><th>Phone</th><th>Email</th><th>Actions</th></tr>
+                            </thead>
+                            <tbody id="suppliersTable"><tr><td colspan="5" class="text-center">Loading...</td></tr></tbody>
                         </table>
                     </div>
                 </div>
@@ -213,26 +170,16 @@
         <div id="locationsView" class="view" style="display:none;">
             <div class="d-flex justify-content-between align-items-center mb-4">
                 <h2><i class="bi bi-geo-alt"></i> Locations</h2>
-                <button class="btn btn-primary" onclick="showAddLocationModal()">
-                    <i class="bi bi-plus-circle"></i> Add Location
-                </button>
+                <button class="btn btn-primary" onclick="showAddLocationModal()"><i class="bi bi-plus-circle"></i> Add Location</button>
             </div>
-            
             <div class="card">
                 <div class="card-body">
                     <div class="table-responsive">
                         <table class="table table-hover">
                             <thead>
-                                <tr>
-                                    <th>Name</th>
-                                    <th>Section</th>
-                                    <th>Description</th>
-                                    <th>Created</th>
-                                </tr>
+                                <tr><th>Name</th><th>Section</th><th>Description</th><th>Created</th><th>Actions</th></tr>
                             </thead>
-                            <tbody id="locationsTable">
-                                <tr><td colspan="4" class="text-center">Loading...</td></tr>
-                            </tbody>
+                            <tbody id="locationsTable"><tr><td colspan="5" class="text-center">Loading...</td></tr></tbody>
                         </table>
                     </div>
                 </div>
@@ -240,162 +187,28 @@
         </div>
     </div>
 
-    <!-- Add Product Modal -->
-    <div class="modal fade" id="addProductModal" tabindex="-1">
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title">Add Product</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                </div>
-                <div class="modal-body">
-                    <form id="addProductForm">
-                        <div class="mb-3">
-                            <label class="form-label">Product Name *</label>
-                            <input type="text" class="form-control" name="name" required>
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label">Barcode</label>
-                            <input type="text" class="form-control" name="sku">
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label">Department</label>
-                            <input type="text" class="form-control" name="category" placeholder="e.g., Dairy, Produce, Meat">
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label">Items per Case</label>
-                            <input type="number" class="form-control" name="unit" placeholder="Number of items in one case">
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label">Price per Case</label>
-                            <input type="number" step="0.01" class="form-control" name="cost_price" placeholder="0.00">
-                        </div>
-                    </form>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <button type="button" class="btn btn-primary" onclick="addProduct()">Add Product</button>
-                </div>
-            </div>
-        </div>
-    </div>
+    <!-- Add/Edit Product Modals -->
+    <div class="modal fade" id="addProductModal" tabindex="-1"><div class="modal-dialog"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">Add Product</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><form id="addProductForm"><div class="mb-3"><label class="form-label">Product Name *</label><input type="text" class="form-control" name="name" required></div><div class="mb-3"><label class="form-label">Barcode</label><input type="text" class="form-control" name="sku"></div><div class="mb-3"><label class="form-label">Department</label><select class="form-select" name="department_id" id="addProductDepartment"><option value="">Select department...</option></select></div><div class="mb-3"><label class="form-label">Supplier</label><select class="form-select" name="supplier_id" id="addProductSupplier"><option value="">Select supplier...</option></select></div><div class="mb-3"><label class="form-label">Items per Case</label><input type="number" class="form-control" name="unit" placeholder="Number of items in one case"></div><div class="mb-3"><label class="form-label">Price per Case</label><input type="number" step="0.01" class="form-control" name="cost_price" placeholder="0.00"></div></form></div><div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><button type="button" class="btn btn-primary" onclick="addProduct()">Add Product</button></div></div></div></div>
 
-    <!-- Edit Product Modal -->
-    <div class="modal fade" id="editProductModal" tabindex="-1">
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title">Edit Product</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                </div>
-                <div class="modal-body">
-                    <form id="editProductForm">
-                        <input type="hidden" name="id" id="editProductId">
-                        <div class="mb-3">
-                            <label class="form-label">Product Name *</label>
-                            <input type="text" class="form-control" name="name" id="editProductName" required>
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label">Barcode</label>
-                            <input type="text" class="form-control" name="sku" id="editProductSku">
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label">Department</label>
-                            <input type="text" class="form-control" name="category" id="editProductCategory" placeholder="e.g., Dairy, Produce, Meat">
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label">Items per Case</label>
-                            <input type="number" class="form-control" name="unit" id="editProductUnit" placeholder="Number of items in one case">
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label">Price per Case</label>
-                            <input type="number" step="0.01" class="form-control" name="cost_price" id="editProductPrice" placeholder="0.00">
-                        </div>
-                    </form>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <button type="button" class="btn btn-primary" onclick="updateProduct()">Save Changes</button>
-                </div>
-            </div>
-        </div>
-    </div>
+    <div class="modal fade" id="editProductModal" tabindex="-1"><div class="modal-dialog"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">Edit Product</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><form id="editProductForm"><input type="hidden" name="id" id="editProductId"><div class="mb-3"><label class="form-label">Product Name *</label><input type="text" class="form-control" name="name" id="editProductName" required></div><div class="mb-3"><label class="form-label">Barcode</label><input type="text" class="form-control" name="sku" id="editProductSku"></div><div class="mb-3"><label class="form-label">Department</label><select class="form-select" name="department_id" id="editProductDepartment"><option value="">Select department...</option></select></div><div class="mb-3"><label class="form-label">Supplier</label><select class="form-select" name="supplier_id" id="editProductSupplier"><option value="">Select supplier...</option></select></div><div class="mb-3"><label class="form-label">Items per Case</label><input type="number" class="form-control" name="unit" id="editProductUnit"></div><div class="mb-3"><label class="form-label">Price per Case</label><input type="number" step="0.01" class="form-control" name="cost_price" id="editProductPrice"></div></form></div><div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><button type="button" class="btn btn-primary" onclick="updateProduct()">Save Changes</button></div></div></div></div>
 
-    <!-- Add Stock Modal -->
-    <div class="modal fade" id="addStockModal" tabindex="-1">
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title">Add Stock</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                </div>
-                <div class="modal-body">
-                    <form id="addStockForm">
-                        <div class="mb-3">
-                            <label class="form-label">Product *</label>
-                            <select class="form-select" name="product_id" id="stockProductSelect" required>
-                                <option value="">Select product...</option>
-                            </select>
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label">Location</label>
-                            <select class="form-select" name="location_id" id="stockLocationSelect">
-                                <option value="">No location</option>
-                            </select>
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label">Quantity *</label>
-                            <input type="number" step="0.01" class="form-control" name="quantity" required>
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label">Expiry Date</label>
-                            <input type="date" class="form-control" name="expiry_date">
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label">Notes</label>
-                            <textarea class="form-control" name="notes" rows="2"></textarea>
-                        </div>
-                    </form>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <button type="button" class="btn btn-primary" onclick="addStock()">Add Stock</button>
-                </div>
-            </div>
-        </div>
-    </div>
+    <!-- Stock Modal -->
+    <div class="modal fade" id="addStockModal" tabindex="-1"><div class="modal-dialog"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">Add Stock</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><form id="addStockForm"><div class="mb-3"><label class="form-label">Product *</label><select class="form-select" name="product_id" id="stockProductSelect" required><option value="">Select product...</option></select></div><div class="mb-3"><label class="form-label">Location</label><select class="form-select" name="location_id" id="stockLocationSelect"><option value="">No location</option></select></div><div class="mb-3"><label class="form-label">Quantity *</label><input type="number" step="0.01" class="form-control" name="quantity" required></div><div class="mb-3"><label class="form-label">Expiry Date</label><input type="date" class="form-control" name="expiry_date"></div><div class="mb-3"><label class="form-label">Notes</label><textarea class="form-control" name="notes" rows="2"></textarea></div></form></div><div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><button type="button" class="btn btn-primary" onclick="addStock()">Add Stock</button></div></div></div></div>
 
-    <!-- Add Location Modal -->
-    <div class="modal fade" id="addLocationModal" tabindex="-1">
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title">Add Location</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                </div>
-                <div class="modal-body">
-                    <form id="addLocationForm">
-                        <div class="mb-3">
-                            <label class="form-label">Location Name *</label>
-                            <input type="text" class="form-control" name="name" required placeholder="e.g., Shelf A1">
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label">Section</label>
-                            <input type="text" class="form-control" name="section" placeholder="e.g., Cold Storage">
-                        </div>
-                        <div class="mb-3">
-                            <label class="form-label">Description</label>
-                            <textarea class="form-control" name="description" rows="2"></textarea>
-                        </div>
-                    </form>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-                    <button type="button" class="btn btn-primary" onclick="addLocation()">Add Location</button>
-                </div>
-            </div>
-        </div>
-    </div>
+    <!-- Department Modals -->
+    <div class="modal fade" id="addDepartmentModal" tabindex="-1"><div class="modal-dialog"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">Add Department</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><form id="addDepartmentForm"><div class="mb-3"><label class="form-label">Department Name *</label><input type="text" class="form-control" name="name" required></div><div class="mb-3"><label class="form-label">Description</label><textarea class="form-control" name="description" rows="2"></textarea></div></form></div><div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><button type="button" class="btn btn-primary" onclick="addDepartment()">Add</button></div></div></div></div>
+
+    <div class="modal fade" id="editDepartmentModal" tabindex="-1"><div class="modal-dialog"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">Edit Department</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><form id="editDepartmentForm"><input type="hidden" id="editDepartmentId"><div class="mb-3"><label class="form-label">Department Name *</label><input type="text" class="form-control" id="editDepartmentName" required></div><div class="mb-3"><label class="form-label">Description</label><textarea class="form-control" id="editDepartmentDescription" rows="2"></textarea></div></form></div><div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><button type="button" class="btn btn-primary" onclick="updateDepartment()">Save</button></div></div></div></div>
+
+    <!-- Supplier Modals -->
+    <div class="modal fade" id="addSupplierModal" tabindex="-1"><div class="modal-dialog"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">Add Supplier</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><form id="addSupplierForm"><div class="mb-3"><label class="form-label">Supplier Name *</label><input type="text" class="form-control" name="name" required></div><div class="mb-3"><label class="form-label">Contact Name</label><input type="text" class="form-control" name="contact_name"></div><div class="mb-3"><label class="form-label">Phone</label><input type="tel" class="form-control" name="phone"></div><div class="mb-3"><label class="form-label">Email</label><input type="email" class="form-control" name="email"></div><div class="mb-3"><label class="form-label">Address</label><textarea class="form-control" name="address" rows="2"></textarea></div><div class="mb-3"><label class="form-label">Notes</label><textarea class="form-control" name="notes" rows="2"></textarea></div></form></div><div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><button type="button" class="btn btn-primary" onclick="addSupplier()">Add</button></div></div></div></div>
+
+    <div class="modal fade" id="editSupplierModal" tabindex="-1"><div class="modal-dialog"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">Edit Supplier</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><form id="editSupplierForm"><input type="hidden" id="editSupplierId"><div class="mb-3"><label class="form-label">Supplier Name *</label><input type="text" class="form-control" id="editSupplierName" required></div><div class="mb-3"><label class="form-label">Contact Name</label><input type="text" class="form-control" id="editSupplierContact"></div><div class="mb-3"><label class="form-label">Phone</label><input type="tel" class="form-control" id="editSupplierPhone"></div><div class="mb-3"><label class="form-label">Email</label><input type="email" class="form-control" id="editSupplierEmail"></div><div class="mb-3"><label class="form-label">Address</label><textarea class="form-control" id="editSupplierAddress" rows="2"></textarea></div><div class="mb-3"><label class="form-label">Notes</label><textarea class="form-control" id="editSupplierNotes" rows="2"></textarea></div></form></div><div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><button type="button" class="btn btn-primary" onclick="updateSupplier()">Save</button></div></div></div></div>
+
+    <!-- Location Modals -->
+    <div class="modal fade" id="addLocationModal" tabindex="-1"><div class="modal-dialog"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">Add Location</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><form id="addLocationForm"><div class="mb-3"><label class="form-label">Location Name *</label><input type="text" class="form-control" name="name" required></div><div class="mb-3"><label class="form-label">Section</label><input type="text" class="form-control" name="section"></div><div class="mb-3"><label class="form-label">Description</label><textarea class="form-control" name="description" rows="2"></textarea></div></form></div><div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><button type="button" class="btn btn-primary" onclick="addLocation()">Add</button></div></div></div></div>
+
+    <div class="modal fade" id="editLocationModal" tabindex="-1"><div class="modal-dialog"><div class="modal-content"><div class="modal-header"><h5 class="modal-title">Edit Location</h5><button type="button" class="btn-close" data-bs-dismiss="modal"></button></div><div class="modal-body"><form id="editLocationForm"><input type="hidden" id="editLocationId"><div class="mb-3"><label class="form-label">Location Name *</label><input type="text" class="form-control" id="editLocationName" required></div><div class="mb-3"><label class="form-label">Section</label><input type="text" class="form-control" id="editLocationSection"></div><div class="mb-3"><label class="form-label">Description</label><textarea class="form-control" id="editLocationDescription" rows="2"></textarea></div></form></div><div class="modal-footer"><button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button><button type="button" class="btn btn-primary" onclick="updateLocation()">Save</button></div></div></div></div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script src="/js/app.js"></script>
