@@ -211,6 +211,29 @@ iptables -t nat -A POSTROUTING -j MASQUERADE
 
 ## 🐛 Troubleshooting
 
+### Database Permission Errors (API Returns 500)
+
+If you see "permission denied for table" errors in logs:
+
+```bash
+# Inside container, run the fix script
+pct enter <container-id>
+bash <(curl -fsSL https://raw.githubusercontent.com/zv20/bcinv/main/fix-permissions.sh)
+```
+
+**Or manually:**
+```bash
+su - postgres -c "psql -d bcinv" << 'EOF'
+GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO bcinv;
+GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO bcinv;
+GRANT ALL PRIVILEGES ON ALL VIEWS IN SCHEMA public TO bcinv;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO bcinv;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO bcinv;
+EOF
+
+systemctl restart bcinv-api bcinv-worker
+```
+
 ### Container Won't Start
 ```bash
 pct start <container-id>
@@ -243,6 +266,9 @@ systemctl status postgresql
 su - postgres
 psql -l  # List databases
 psql -d bcinv  # Connect to database
+
+# Test database connection
+psql -U bcinv -d bcinv -c "SELECT COUNT(*) FROM products;"
 ```
 
 ### Update Failed
