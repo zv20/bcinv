@@ -146,10 +146,13 @@ async function loadProducts() {
                 <td>${p.name}</td>
                 <td>${p.sku || '-'}</td>
                 <td>${p.category || '-'}</td>
-                <td>${p.unit}</td>
+                <td>${p.unit || '-'}</td>
                 <td>$${parseFloat(p.cost_price || 0).toFixed(2)}</td>
                 <td>
-                    <button class="btn btn-sm btn-danger btn-icon" onclick="deleteProduct(${p.id}, '${p.name}')">
+                    <button class="btn btn-sm btn-primary btn-icon" onclick='editProduct(${JSON.stringify(p)})' title="Edit">
+                        <i class="bi bi-pencil"></i>
+                    </button>
+                    <button class="btn btn-sm btn-danger btn-icon" onclick="deleteProduct(${p.id}, '${p.name.replace(/'/g, "\\'")}')" title="Delete">
                         <i class="bi bi-trash"></i>
                     </button>
                 </td>
@@ -176,10 +179,13 @@ async function searchProducts() {
                 <td>${p.name}</td>
                 <td>${p.sku || '-'}</td>
                 <td>${p.category || '-'}</td>
-                <td>${p.unit}</td>
+                <td>${p.unit || '-'}</td>
                 <td>$${parseFloat(p.cost_price || 0).toFixed(2)}</td>
                 <td>
-                    <button class="btn btn-sm btn-danger btn-icon" onclick="deleteProduct(${p.id}, '${p.name}')">
+                    <button class="btn btn-sm btn-primary btn-icon" onclick='editProduct(${JSON.stringify(p)})' title="Edit">
+                        <i class="bi bi-pencil"></i>
+                    </button>
+                    <button class="btn btn-sm btn-danger btn-icon" onclick="deleteProduct(${p.id}, '${p.name.replace(/'/g, "\\'")}')" title="Delete">
                         <i class="bi bi-trash"></i>
                     </button>
                 </td>
@@ -221,6 +227,45 @@ async function addProduct() {
     }
 }
 
+function editProduct(product) {
+    document.getElementById('editProductId').value = product.id;
+    document.getElementById('editProductName').value = product.name;
+    document.getElementById('editProductSku').value = product.sku || '';
+    document.getElementById('editProductCategory').value = product.category || '';
+    document.getElementById('editProductUnit').value = product.unit || '';
+    document.getElementById('editProductPrice').value = product.cost_price || '';
+    
+    new bootstrap.Modal(document.getElementById('editProductModal')).show();
+}
+
+async function updateProduct() {
+    const form = document.getElementById('editProductForm');
+    const formData = new FormData(form);
+    const data = Object.fromEntries(formData);
+    const id = data.id;
+    delete data.id;
+    
+    try {
+        const response = await fetch(`${API_URL}/products/${id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(data)
+        });
+        
+        if (response.ok) {
+            bootstrap.Modal.getInstance(document.getElementById('editProductModal')).hide();
+            loadProducts();
+            alert('Product updated successfully!');
+        } else {
+            const error = await response.json();
+            alert('Error: ' + error.error);
+        }
+    } catch (error) {
+        console.error('Update product error:', error);
+        alert('Failed to update product');
+    }
+}
+
 async function deleteProduct(id, name) {
     if (!confirm(`Delete product "${name}"?`)) return;
     
@@ -259,10 +304,10 @@ async function loadStock() {
                     <td class="${expiryClass}">${s.expiry_date ? new Date(s.expiry_date).toLocaleDateString() : '-'}</td>
                     <td class="${expiryClass}">${daysLeft !== null ? daysLeft + ' days' : '-'}</td>
                     <td>
-                        <button class="btn btn-sm btn-warning btn-icon" onclick="adjustStock(${s.id}, '${s.product_name}', ${s.quantity})" title="Adjust">
+                        <button class="btn btn-sm btn-warning btn-icon" onclick="adjustStock(${s.id}, '${s.product_name.replace(/'/g, "\\'")}', ${s.quantity})" title="Adjust">
                             <i class="bi bi-pencil"></i>
                         </button>
-                        <button class="btn btn-sm btn-danger btn-icon" onclick="discardStock(${s.id}, '${s.product_name}', ${s.quantity})" title="Discard">
+                        <button class="btn btn-sm btn-danger btn-icon" onclick="discardStock(${s.id}, '${s.product_name.replace(/'/g, "\\'")}', ${s.quantity})" title="Discard">
                             <i class="bi bi-trash"></i>
                         </button>
                     </td>
@@ -282,7 +327,7 @@ function showAddStockModal() {
     ]).then(([productsData, locations]) => {
         document.getElementById('stockProductSelect').innerHTML = 
             '<option value="">Select product...</option>' +
-            productsData.products.map(p => `<option value="${p.id}">${p.name} (${p.sku || 'No SKU'})</option>`).join('');
+            productsData.products.map(p => `<option value="${p.id}">${p.name} (${p.sku || 'No Barcode'})</option>`).join('');
         
         document.getElementById('stockLocationSelect').innerHTML = 
             '<option value="">No location</option>' +
@@ -400,7 +445,7 @@ async function loadExpiring() {
                     <td class="${daysClass}">${new Date(item.expiry_date).toLocaleDateString()}</td>
                     <td class="${daysClass}"><strong>${Math.floor(item.days_until_expiry)} days</strong></td>
                     <td>
-                        <button class="btn btn-sm btn-danger btn-icon" onclick="discardStock(${item.batch_id}, '${item.product_name}', ${item.quantity})">
+                        <button class="btn btn-sm btn-danger btn-icon" onclick="discardStock(${item.batch_id}, '${item.product_name.replace(/'/g, "\\'")}', ${item.quantity})">
                             <i class="bi bi-trash"></i> Discard
                         </button>
                     </td>
