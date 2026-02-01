@@ -1,23 +1,27 @@
-# 🛒 BCInv - Simple Grocery Inventory Management
+# BC Inventory Management System
 
-> Lightweight inventory system for grocery stores - track stock, expiry dates, and shelf locations.
+> Simple, focused grocery inventory system for tracking 10,000-20,000 products with expiry monitoring and shelf audits.
 
 ## Features
 
-- 📦 **Product Management** - Add, edit, delete products (supports 10k-20k items)
-- 📍 **Multi-location Tracking** - Track stock across multiple shelves/sections
-- 📅 **Expiry Monitoring** - Automatic daily checks for expired items
-- 🔍 **Stock Audits** - Easy weekly/monthly shelf checks
-- 💾 **PostgreSQL Backend** - Reliable, scalable database
-- 🐳 **LXC Ready** - Single container deployment
+### Core Functionality
+- ✅ **Product Management** - Add/edit/delete products with SKU tracking
+- 📦 **Stock Tracking** - Monitor inventory across multiple shelf locations
+- 📅 **Expiry Management** - Track expiration dates and get 7-day warnings
+- 🔍 **Audit System** - Record weekly/monthly shelf checks and adjustments
+- ⚠️ **Discard Tracking** - Log expired and damaged items
+- 📊 **Simple Dashboard** - View stock levels, expiring items, recent activity
+
+### Optimized for Scale
+- Handles 10,000-20,000 products efficiently
+- Indexed database queries for fast lookups
+- PostgreSQL for reliability and performance
 
 ## Quick Start
 
 ### Prerequisites
-
-- Node.js 18+ or 20 LTS
-- PostgreSQL 14+
-- LXC container (Debian/Ubuntu based)
+- LXC container (Ubuntu/Debian)
+- Root access for initial setup
 
 ### Installation
 
@@ -26,162 +30,127 @@
 git clone https://github.com/zv20/bcinv.git
 cd bcinv
 
-# Run setup script (installs everything)
+# Run automated setup
 sudo bash setup.sh
 ```
 
 The setup script will:
-- Install Node.js 20 LTS
-- Install and configure PostgreSQL
-- Create database and user
-- Install dependencies
-- Run database migrations
-- Create systemd services
-- Start the application
+1. Install Node.js 20 LTS
+2. Install and configure PostgreSQL
+3. Create database and user
+4. Install dependencies
+5. Run database migrations
+6. Create systemd services
+7. Start the application
 
-### Manual Installation
+### Access
 
-```bash
-# Install dependencies
-npm install
-
-# Copy environment file
-cp .env.example .env
-# Edit .env with your database credentials
-
-# Run migrations
-npm run migrate
-
-# Start API server
-npm start
-
-# Start worker (in another terminal)
-npm run worker
+```
+http://your-lxc-ip:3000
 ```
 
 ## Usage
 
-1. **Access the app**: http://localhost:3000
-2. **Products Tab**: Add/edit/delete products
-3. **Stock Tab**: Check in new stock, update quantities
-4. **Expiring Tab**: View items expiring in 7 days
-5. **Audit Mode**: Weekly/monthly shelf checks with damage tracking
+### Product Management
+1. Add products with SKU, name, category
+2. Assign to shelf locations
+3. Track cost price for inventory value
 
-## System Architecture
+### Stock Audits
+1. Navigate to **Audit** section
+2. Select location/shelf
+3. Update quantities based on physical count
+4. System logs all changes automatically
 
-```
-bcinv/
-├── server.js              # Express API server
-├── worker.js              # Background expiry checker
-├── package.json           # Dependencies
-├── migrations/            # Database schema
-│   ├── 001_initial.sql
-│   └── migrate.js
-├── public/               # Frontend
-│   ├── index.html
-│   ├── css/style.css
-│   └── js/app.js
-├── setup.sh              # Installation script
-├── update.sh             # Update script
-└── README.md
-```
+### Expiry Monitoring
+- View **Expiring Soon** to see items expiring in 7 days
+- Mark items as expired or damaged
+- System tracks discard reasons (expired/damaged/other)
 
-## Database Schema
-
-### Products Table
-- Product info (name, SKU, category, unit)
-- Support for 10k-20k products
-
-### Stock Batches Table
-- Track individual stock batches
-- Expiry dates per batch
-- Shelf/section locations
-- Damage tracking
-- Discard history
-
-## Systemd Services
+## Updates
 
 ```bash
-# Start services
-sudo systemctl start bcinv-api
-sudo systemctl start bcinv-worker
+# Pull latest changes from GitHub
+bash update.sh
+```
 
-# Check status
+Update script automatically:
+- Creates PostgreSQL backup
+- Pulls code updates
+- Runs database migrations
+- Restarts services
+- Shows rollback command if issues occur
+
+## System Services
+
+```bash
+# API server
 sudo systemctl status bcinv-api
+sudo systemctl restart bcinv-api
+
+# Background worker (expiry checks)
 sudo systemctl status bcinv-worker
+sudo systemctl restart bcinv-worker
 
 # View logs
 journalctl -u bcinv-api -f
 journalctl -u bcinv-worker -f
 ```
 
-## Updates
+## Database
+
+### Tables
+- `products` - Product catalog
+- `locations` - Shelf/section definitions
+- `stock_batches` - Individual stock entries with expiry
+- `audit_log` - All stock changes
+- `discarded_items` - Expired/damaged tracking
+
+### Backups
 
 ```bash
-# Pull latest changes and restart
-bash update.sh
+# Manual backup
+pg_dump -U bcinv_user bcinv > backup_$(date +%Y%m%d).sql
+
+# Restore
+psql -U bcinv_user bcinv < backup_20260131.sql
 ```
 
-The update script automatically:
-- Fetches updates from GitHub
-- Shows changelog
-- Creates database backup
-- Runs migrations
-- Restarts services
+## Architecture
 
-## API Endpoints
-
-### Products
-- `GET /api/products` - List all products
-- `POST /api/products` - Create product
-- `PUT /api/products/:id` - Update product
-- `DELETE /api/products/:id` - Delete product
-
-### Stock
-- `GET /api/stock` - View all stock
-- `POST /api/stock/add` - Add new stock batch
-- `PUT /api/stock/update/:id` - Update quantity
-- `POST /api/stock/discard/:id` - Mark as discarded
-- `GET /api/stock/expiring` - Items expiring in 7 days
-- `GET /api/stock/expired` - Already expired items
-
-### Dashboard
-- `GET /api/dashboard` - Summary stats
-
-## Configuration
-
-Edit `.env` file:
-
-```env
-DB_HOST=localhost
-DB_PORT=5432
-DB_NAME=bcinv
-DB_USER=bcinv_user
-DB_PASSWORD=your_password
+```
+bcinv/
+├── server.js              # Express API server
+├── worker.js              # Background expiry checker
+├── database/
+│   └── schema.sql        # Database schema
+├── migrations/
+│   └── migrate.js        # Migration runner
+├── routes/
+│   ├── products.js
+│   ├── stock.js
+│   └── audit.js
+├── public/               # Frontend
+│   ├── index.html
+│   ├── css/
+│   └── js/
+├── setup.sh             # Installation script
+└── update.sh            # Update script
 ```
 
-## Backup & Restore
+## Tech Stack
 
-### Create Backup
-```bash
-pg_dump bcinv > backups/backup_$(date +%Y%m%d_%H%M%S).sql
-```
-
-### Restore Backup
-```bash
-psql bcinv < backups/backup_20260131_220000.sql
-```
-
-## LXC Container Deployment
-
-See [docs/LXC_SETUP.md](docs/LXC_SETUP.md) for detailed LXC container setup guide.
+- **Backend**: Node.js + Express
+- **Database**: PostgreSQL 14+
+- **Frontend**: Vanilla JavaScript + Bootstrap 5
+- **Process Manager**: systemd
+- **Container**: LXC
 
 ## License
 
-MIT License - see LICENSE file for details.
+MIT
 
 ---
 
-**Version**: 1.0.0  
-**Status**: Production Ready  
-**Support**: [GitHub Issues](https://github.com/zv20/bcinv/issues)
+**Version**: 0.1.0  
+**Status**: Active Development
