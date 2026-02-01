@@ -25,6 +25,9 @@ app.use((req, res, next) => {
 // Static files
 app.use(express.static('public'));
 
+// Helper function to convert empty strings to null
+const emptyToNull = (value) => (value === '' || value === undefined) ? null : value;
+
 // Health check
 app.get('/api/health', async (req, res) => {
   try {
@@ -135,7 +138,14 @@ app.post('/api/products', async (req, res) => {
       `INSERT INTO products (name, category, sku, unit, description, cost_price)
        VALUES ($1, $2, $3, $4, $5, $6)
        RETURNING *`,
-      [name, category, sku, unit || 'units', description, cost_price]
+      [
+        name, 
+        emptyToNull(category), 
+        emptyToNull(sku), 
+        unit || 'units', 
+        emptyToNull(description), 
+        emptyToNull(cost_price)
+      ]
     );
     
     logger.info(`Product created: ${name} (ID: ${result.rows[0].id})`);
@@ -165,7 +175,15 @@ app.put('/api/products/:id', async (req, res) => {
            updated_at = CURRENT_TIMESTAMP
        WHERE id = $7
        RETURNING *`,
-      [name, category, sku, unit, description, cost_price, req.params.id]
+      [
+        emptyToNull(name), 
+        emptyToNull(category), 
+        emptyToNull(sku), 
+        emptyToNull(unit), 
+        emptyToNull(description), 
+        emptyToNull(cost_price), 
+        req.params.id
+      ]
     );
     
     if (result.rows.length === 0) {
@@ -217,7 +235,7 @@ app.post('/api/locations', async (req, res) => {
   try {
     const result = await pool.query(
       'INSERT INTO locations (name, section, description) VALUES ($1, $2, $3) RETURNING *',
-      [name, section, description]
+      [name, emptyToNull(section), emptyToNull(description)]
     );
     
     logger.info(`Location created: ${name}`);
@@ -287,14 +305,20 @@ app.post('/api/stock/add', async (req, res) => {
       `INSERT INTO stock_batches (product_id, location_id, quantity, expiry_date, notes)
        VALUES ($1, $2, $3, $4, $5)
        RETURNING *`,
-      [product_id, location_id, quantity, expiry_date, notes]
+      [
+        product_id, 
+        emptyToNull(location_id), 
+        quantity, 
+        emptyToNull(expiry_date), 
+        emptyToNull(notes)
+      ]
     );
     
     // Log audit
     await client.query(
       `INSERT INTO audit_log (product_id, batch_id, action, quantity_change, reason, notes)
        VALUES ($1, $2, 'add_stock', $3, 'stock_added', $4)`,
-      [product_id, batchResult.rows[0].id, quantity, notes]
+      [product_id, batchResult.rows[0].id, quantity, emptyToNull(notes)]
     );
     
     await client.query('COMMIT');
@@ -339,7 +363,7 @@ app.post('/api/stock/adjust', async (req, res) => {
     await client.query(
       `INSERT INTO audit_log (product_id, batch_id, action, quantity_change, reason, notes)
        VALUES ($1, $2, 'adjust_stock', $3, $4, $5)`,
-      [result.rows[0].product_id, batch_id, quantity, reason || 'manual_audit', notes]
+      [result.rows[0].product_id, batch_id, quantity, reason || 'manual_audit', emptyToNull(notes)]
     );
     
     await client.query('COMMIT');
@@ -383,7 +407,7 @@ app.post('/api/stock/discard', async (req, res) => {
     await client.query(
       `INSERT INTO discarded_items (batch_id, product_id, quantity, reason, notes)
        VALUES ($1, $2, $3, $4, $5)`,
-      [batch_id, batch.product_id, quantity, reason, notes]
+      [batch_id, batch.product_id, quantity, reason, emptyToNull(notes)]
     );
     
     // Update or remove batch
@@ -404,7 +428,7 @@ app.post('/api/stock/discard', async (req, res) => {
     await client.query(
       `INSERT INTO audit_log (product_id, batch_id, action, quantity_change, reason, notes)
        VALUES ($1, $2, 'discard', $3, $4, $5)`,
-      [batch.product_id, batch_id, -quantity, reason, notes]
+      [batch.product_id, batch_id, -quantity, reason, emptyToNull(notes)]
     );
     
     await client.query('COMMIT');
