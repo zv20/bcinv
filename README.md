@@ -1,156 +1,328 @@
-# BC Inventory Management System
+# BC Inventory - Proxmox LXC Installer
 
-> Simple, focused grocery inventory system for tracking 10,000-20,000 products with expiry monitoring and shelf audits.
+**One-click automated Proxmox LXC installer for BC Inventory** - the complete grocery store inventory management system.
 
-## Features
+## 🚀 Quick Start
 
-### Core Functionality
-- ✅ **Product Management** - Add/edit/delete products with SKU tracking
-- 📦 **Stock Tracking** - Monitor inventory across multiple shelf locations
-- 📅 **Expiry Management** - Track expiration dates and get 7-day warnings
-- 🔍 **Audit System** - Record weekly/monthly shelf checks and adjustments
-- ⚠️ **Discard Tracking** - Log expired and damaged items
-- 📊 **Simple Dashboard** - View stock levels, expiring items, recent activity
-
-### Optimized for Scale
-- Handles 10,000-20,000 products efficiently
-- Indexed database queries for fast lookups
-- PostgreSQL for reliability and performance
-
-## Quick Start
-
-### Prerequisites
-- LXC container (Ubuntu/Debian)
-- Root access for initial setup
-
-### Installation
+Run this command on your **Proxmox host** (as root):
 
 ```bash
-# Clone repository
+bash <(curl -fsSL https://raw.githubusercontent.com/zv20/bcinv/main/install.sh)
+```
+
+That's it! The script will:
+- ✅ Create a new LXC container
+- ✅ Install Debian 12
+- ✅ Install Node.js 20 LTS
+- ✅ Install and configure PostgreSQL
+- ✅ Clone and setup BC Inventory
+- ✅ Create systemd services
+- ✅ Start everything automatically
+
+## 📋 What You'll Get
+
+### Automated Installation
+- **Interactive configuration** - Choose container ID, resources, networking
+- **Branch selection** - Pick which version to install
+- **Secure by default** - Optional root password, PostgreSQL credentials
+- **Production ready** - Systemd services with auto-restart
+- **Clean MOTD** - Shows status, IP, and useful commands on login
+
+### System Specifications
+**Default Resources:**
+- 4 CPU cores
+- 4096 MB RAM
+- 16 GB disk
+- Debian 12 LXC
+- PostgreSQL 15
+- Node.js 20 LTS
+
+**Adjustable During Install:**
+- Container ID
+- Hostname
+- CPU/Memory/Disk
+- Network (DHCP or Static IP)
+- Storage location
+
+## 🎯 Features
+
+### BC Inventory Application
+- **Product Management** - Track products, prices, expiry dates
+- **Barcode Support** - Scan and search products
+- **Expiry Tracking** - Automatic notifications for expiring items
+- **Sales Recording** - Track sales and inventory movements
+- **Web Interface** - Clean, responsive UI accessible from any device
+- **API Server** - RESTful API for integrations
+- **Background Worker** - Automated expiry checking
+
+### Installation Script Features
+- ✓ **Branch selection** - Choose main, development, or custom branches
+- ✓ **Template management** - Auto-downloads Debian templates
+- ✓ **Network flexibility** - DHCP or static IP configuration
+- ✓ **Password setup** - Optional secure container access
+- ✓ **Health checks** - Verifies services start correctly
+- ✓ **Error handling** - Clear messages and rollback options
+- ✓ **Update command** - Built-in `update` command for easy updates
+
+## 📦 Installation Options
+
+### Method 1: One-Line Install (Recommended)
+```bash
+bash <(curl -fsSL https://raw.githubusercontent.com/zv20/bcinv/main/install.sh)
+```
+
+### Method 2: Download and Run
+```bash
+wget https://raw.githubusercontent.com/zv20/bcinv/main/install.sh
+chmod +x install.sh
+./install.sh
+```
+
+### Method 3: Clone Repository
+```bash
 git clone https://github.com/zv20/bcinv.git
 cd bcinv
-
-# Run automated setup
-sudo bash setup.sh
+bash install.sh
 ```
 
-The setup script will:
-1. Install Node.js 20 LTS
-2. Install and configure PostgreSQL
-3. Create database and user
-4. Install dependencies
-5. Run database migrations
-6. Create systemd services
-7. Start the application
+## 🔄 Updating
 
-### Access
-
-```
-http://your-lxc-ip:3000
-```
-
-## Usage
-
-### Product Management
-1. Add products with SKU, name, category
-2. Assign to shelf locations
-3. Track cost price for inventory value
-
-### Stock Audits
-1. Navigate to **Audit** section
-2. Select location/shelf
-3. Update quantities based on physical count
-4. System logs all changes automatically
-
-### Expiry Monitoring
-- View **Expiring Soon** to see items expiring in 7 days
-- Mark items as expired or damaged
-- System tracks discard reasons (expired/damaged/other)
-
-## Updates
-
+### From Inside Container
 ```bash
-# Pull latest changes from GitHub
-bash update.sh
+pct enter <container-id>
+update  # or: update-bcinv
 ```
 
-Update script automatically:
-- Creates PostgreSQL backup
-- Pulls code updates
-- Runs database migrations
-- Restarts services
-- Shows rollback command if issues occur
-
-## System Services
-
+### From Proxmox Host
 ```bash
-# API server
-sudo systemctl status bcinv-api
-sudo systemctl restart bcinv-api
+bash <(curl -fsSL https://raw.githubusercontent.com/zv20/bcinv/main/update-from-host.sh) <container-id>
+```
 
-# Background worker (expiry checks)
-sudo systemctl status bcinv-worker
-sudo systemctl restart bcinv-worker
+The update script:
+1. ✓ Shows current version and available updates
+2. ✓ Warns about uncommitted changes
+3. ✓ Creates PostgreSQL backup
+4. ✓ Stops services gracefully
+5. ✓ Pulls latest code
+6. ✓ Updates dependencies
+7. ✓ Runs database migrations
+8. ✓ Restarts services
+9. ✓ Verifies successful startup
+
+## 🎛️ Container Management
+
+### Basic Commands
+```bash
+# Start/Stop
+pct start <container-id>
+pct stop <container-id>
+pct restart <container-id>
+
+# Status
+pct status <container-id>
+
+# Enter container
+pct enter <container-id>
+
+# Execute command
+pct exec <container-id> -- <command>
+```
+
+### Service Management (inside container)
+```bash
+# Check status
+systemctl status bcinv-api
+systemctl status bcinv-worker
 
 # View logs
 journalctl -u bcinv-api -f
 journalctl -u bcinv-worker -f
+
+# Restart
+systemctl restart bcinv-api bcinv-worker
 ```
 
-## Database
+## 🔧 Configuration
 
-### Tables
-- `products` - Product catalog
-- `locations` - Shelf/section definitions
-- `stock_batches` - Individual stock entries with expiry
-- `audit_log` - All stock changes
-- `discarded_items` - Expired/damaged tracking
+### Database Connection
+The installer automatically configures:
+- Database: `bcinv`
+- User: `bcinv`
+- Password: `bcinv123` (change in production)
+- Host: `localhost`
+- Port: `5432`
 
-### Backups
+### Environment Variables
+Systemd service files include:
+```ini
+NODE_ENV=production
+PORT=3000
+DB_HOST=localhost
+DB_PORT=5432
+DB_NAME=bcinv
+DB_USER=bcinv
+DB_PASSWORD=bcinv123
+```
 
+### Changing Database Password
 ```bash
-# Manual backup
-pg_dump -U bcinv_user bcinv > backup_$(date +%Y%m%d).sql
+pct enter <container-id>
 
-# Restore
-psql -U bcinv_user bcinv < backup_20260131.sql
+# Change PostgreSQL password
+su - postgres
+psql
+ALTER USER bcinv WITH PASSWORD 'new_password';
+\q
+exit
+
+# Update service files
+sed -i 's/DB_PASSWORD=bcinv123/DB_PASSWORD=new_password/' /etc/systemd/system/bcinv-*.service
+systemctl daemon-reload
+systemctl restart bcinv-api bcinv-worker
 ```
 
-## Architecture
+## 🌐 Networking
 
+### Access the Application
+After installation:
 ```
-bcinv/
-├── server.js              # Express API server
-├── worker.js              # Background expiry checker
-├── database/
-│   └── schema.sql        # Database schema
-├── migrations/
-│   └── migrate.js        # Migration runner
-├── routes/
-│   ├── products.js
-│   ├── stock.js
-│   └── audit.js
-├── public/               # Frontend
-│   ├── index.html
-│   ├── css/
-│   └── js/
-├── setup.sh             # Installation script
-└── update.sh            # Update script
+http://<container-ip>:3000
 ```
 
-## Tech Stack
+Find IP address:
+```bash
+pct exec <container-id> -- hostname -I
+```
 
-- **Backend**: Node.js + Express
-- **Database**: PostgreSQL 14+
-- **Frontend**: Vanilla JavaScript + Bootstrap 5
-- **Process Manager**: systemd
-- **Container**: LXC
+### Reverse Proxy Setup
+For external access with SSL, use Nginx Proxy Manager:
 
-## License
+1. Create new proxy host
+2. Forward to: `<container-ip>:3000`
+3. Enable SSL (Let's Encrypt)
+4. Optional: Add authentication
 
-MIT
+### Port Forwarding (Proxmox Host)
+```bash
+# Forward host port 80 to container port 3000
+iptables -t nat -A PREROUTING -p tcp --dport 80 -j DNAT --to <container-ip>:3000
+iptables -t nat -A POSTROUTING -j MASQUERADE
+```
+
+## 🐛 Troubleshooting
+
+### Container Won't Start
+```bash
+pct start <container-id>
+journalctl -xe  # Check Proxmox logs
+```
+
+### Services Not Running
+```bash
+pct enter <container-id>
+systemctl status bcinv-api bcinv-worker
+journalctl -u bcinv-api -n 50
+```
+
+### Can't Connect to Application
+```bash
+# Check if services are listening
+pct exec <container-id> -- ss -tlnp | grep 3000
+
+# Check firewall
+pct exec <container-id> -- iptables -L
+
+# Test from Proxmox host
+curl http://<container-ip>:3000
+```
+
+### Database Issues
+```bash
+pct enter <container-id>
+systemctl status postgresql
+su - postgres
+psql -l  # List databases
+psql -d bcinv  # Connect to database
+```
+
+### Update Failed
+```bash
+# Check what changed
+cd /opt/bcinv
+git status
+git diff
+
+# Reset to clean state
+git reset --hard origin/main
+
+# Restore database from backup
+su - postgres
+psql bcinv < /tmp/bcinv_backup_YYYYMMDD_HHMMSS.sql
+```
+
+## 💾 Backup & Restore
+
+### Backup Container
+```bash
+# Full container backup
+vzdump <container-id> --dumpdir /var/lib/vz/dump --mode snapshot
+
+# Application data only (inside container)
+pct exec <container-id> -- bash -c '
+su - postgres -c "pg_dump bcinv > /root/bcinv_backup_$(date +%Y%m%d).sql"
+tar -czf /root/bcinv_app_$(date +%Y%m%d).tar.gz /opt/bcinv
+'
+```
+
+### Restore Container
+```bash
+# Restore from Proxmox backup
+pct restore <container-id> /var/lib/vz/dump/vzdump-lxc-*.tar.zst
+
+# Restore database only
+pct exec <container-id> -- su - postgres -c "psql bcinv < /root/bcinv_backup.sql"
+```
+
+## 🔒 Security
+
+### Recommendations
+1. **Change default passwords** - Database and container root
+2. **Use reverse proxy** - Enable SSL with Let's Encrypt
+3. **Firewall rules** - Restrict access to port 3000
+4. **Regular updates** - Keep system and app updated
+5. **Backups** - Schedule regular database backups
+
+### Hardening
+```bash
+# Change database password
+su - postgres -c "psql -c \"ALTER USER bcinv WITH PASSWORD 'strong_password';\""
+
+# Update service environment
+vim /etc/systemd/system/bcinv-api.service
+systemctl daemon-reload
+systemctl restart bcinv-api bcinv-worker
+
+# Enable firewall
+apt install ufw
+ufw allow 22/tcp  # SSH
+ufw allow from <trusted-ip> to any port 3000  # App
+ufw enable
+```
+
+## 📚 Additional Resources
+
+- **Main Repository**: [github.com/zv20/bcinv](https://github.com/zv20/bcinv)
+- **Proxmox Docs**: [pve.proxmox.com](https://pve.proxmox.com/wiki/Linux_Container)
+- **Issues**: [github.com/zv20/bcinv/issues](https://github.com/zv20/bcinv/issues)
+
+## 📝 License
+
+MIT License - See repository for details
+
+## 🤝 Contributing
+
+Contributions welcome! Please open an issue or pull request.
 
 ---
 
-**Version**: 0.1.0  
-**Status**: Active Development
+**Made for grocery stores and small businesses** 🏪

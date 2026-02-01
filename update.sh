@@ -1,272 +1,190 @@
 #!/bin/bash
 
+# BC Inventory - Application Update Script
+# Run this inside the container to update to the latest version
+
 set -e
 
-echo "🔄 BC Inventory System - Update"
-echo "====================================="
-echo ""
+# Colors
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+RED='\033[0;31m'
+BLUE='\033[0;34m'
+CYAN='\033[0;36m'
+MAGENTA='\033[0;35m'
+NC='\033[0m'
 
-CURRENT_DIR=$(pwd)
+echo -e "${CYAN}"
+echo "═══════════════════════════════════════════════════════════"
+echo "    📦 BC Inventory - Update Manager"
+echo "═══════════════════════════════════════════════════════════"
+echo -e "${NC}"
+echo
 
-# Verify correct directory
-if [ ! -f "server.js" ]; then
-    echo "❌ server.js not found. Wrong directory?"
+# Check if running inside container
+if [ ! -d "/opt/bcinv" ]; then
+    echo -e "${RED}✖ Error: /opt/bcinv not found!${NC}"
+    echo -e "${YELLOW}This script must be run inside the BC Inventory container${NC}"
     exit 1
 fi
 
-echo "📍 Location: $CURRENT_DIR"
-echo ""
+cd /opt/bcinv
 
-# Load environment for DB credentials
-if [ -f ".env" ]; then
-    export $(cat .env | grep -v '^#' | xargs)
+# Get current info
+CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD 2>/dev/null || echo "unknown")
+CURRENT_COMMIT=$(git rev-parse --short HEAD 2>/dev/null || echo "unknown")
+CURRENT_MESSAGE=$(git log -1 --pretty=%B 2>/dev/null | head -1 || echo "unknown")
+
+echo -e "${BLUE}📋 Current Status${NC}"
+echo -e "  Branch: ${MAGENTA}${CURRENT_BRANCH}${NC}"
+echo -e "  Commit: ${MAGENTA}${CURRENT_COMMIT}${NC}"
+echo -e "  Message: ${MAGENTA}${CURRENT_MESSAGE}${NC}"
+
+# Check service status
+API_STATUS=$(systemctl is-active bcinv-api 2>/dev/null || echo "inactive")
+WORKER_STATUS=$(systemctl is-active bcinv-worker 2>/dev/null || echo "inactive")
+echo -e "  API Service: ${MAGENTA}${API_STATUS}${NC}"
+echo -e "  Worker Service: ${MAGENTA}${WORKER_STATUS}${NC}"
+echo
+
+# Check for uncommitted changes
+if [ -n "$(git status --porcelain)" ]; then
+    echo -e "${YELLOW}⚠️  Warning: You have uncommitted local changes${NC}"
+    echo -e "${YELLOW}These will be overwritten by the update${NC}"
+    git status --short
+    echo
+    read -p "Continue anyway? (y/N): " -n 1 -r
+    echo
+    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+        echo -e "${YELLOW}Update cancelled${NC}"
+        exit 0
+    fi
 fi
 
-echo "========================================"
-echo "🔍 Step 1: Checking for updates..."
-echo "========================================"
-echo ""
+echo -e "${YELLOW}📥 Fetching latest changes from GitHub...${NC}"
+git fetch origin
 
-# Fetch updates without applying
-echo "📡 Fetching latest from GitHub..."
-git fetch origin main
-
-if [ $? -ne 0 ]; then
-    echo "❌ Failed to fetch updates"
-    exit 1
-fi
-
-# Compare local vs remote
 LOCAL=$(git rev-parse @)
 REMOTE=$(git rev-parse @{u})
 
-if [ "$LOCAL" = "$REMOTE" ]; then
-    echo ""
-    echo "✅ Already up to date!"
-    echo ""
+if [ $LOCAL = $REMOTE ]; then
+    echo -e "${GREEN}✓ Already up to date!${NC}"
+    echo -e "${BLUE}Current version is the latest${NC}"
     exit 0
 fi
 
-echo "✅ Updates available!"
-echo ""
+echo -e "${GREEN}📦 New changes available${NC}"
+echo -e "${BLUE}Changes since current version:${NC}"
+git log --oneline HEAD..@{u} | head -10
+echo
 
-# Get current version
-if command -v node &> /dev/null && [ -f "package.json" ]; then
-    CURRENT_VERSION=$(node -p "require('./package.json').version" 2>/dev/null || echo "unknown")
-    echo "📊 Current Version: v$CURRENT_VERSION"
-fi
-
-echo ""
-echo "========================================"
-echo "📋 Step 2: What's New"
-echo "========================================"
-echo ""
-
-echo "Recent changes:"
-git log --oneline --no-merges HEAD..origin/main | head -10 | sed 's/^/  • /'
-echo ""
-
-echo "========================================"
-echo "⚠️  Step 3: Safety Check"
-echo "========================================"
-echo ""
-
-# Show uncommitted changes
-if [ -n "$(git status --porcelain)" ]; then
-    echo "⚠️  WARNING: Uncommitted local changes:"
-    git status --short | head -5
-    echo ""
-    echo "These may be overwritten during update."
-    echo ""
-fi
-
-echo "🚨 IMPORTANT:"
-echo ""
-echo "  1. Database backup will be created automatically"
-echo "  2. Services will restart (brief downtime)"
-echo "  3. Dependencies will be updated if needed"
-echo "  4. Database migrations will run"
-echo "  5. Rollback command provided if issues occur"
-echo ""
-echo "  Backup location: ./backups/"
-echo ""
-
-# Determine if root/sudo needed
-if [ "$EUID" -eq 0 ]; then
-    SUDO_CMD=""
-else
-    SUDO_CMD="sudo"
-fi
-
-echo "========================================"
-echo "❓ Step 4: Confirm Update"
-echo "========================================"
-echo ""
-
-read -p "Continue with update? [y/N] " -n 1 -r
-echo ""
-echo ""
-
-if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-    echo "❌ Update cancelled"
-    echo ""
-    echo "To update later: bash update.sh"
-    echo ""
+read -p "Proceed with update? (Y/n): " -n 1 -r
+echo
+if [[ $REPLY =~ ^[Nn]$ ]]; then
+    echo -e "${YELLOW}Update cancelled${NC}"
     exit 0
 fi
 
-echo "========================================"
-echo "🚀 Step 5: Applying Update"
-echo "========================================"
-echo ""
-
-# Create backup directory
-BACKUP_DIR="./backups"
-mkdir -p "$BACKUP_DIR"
-
-TIMESTAMP=$(date +"%Y-%m-%d_%H-%M-%S")
-BACKUP_FILE="$BACKUP_DIR/backup_${TIMESTAMP}.sql"
-
-echo "💾 Creating PostgreSQL backup..."
-
-if [ -n "$DB_PASSWORD" ] && [ -n "$DB_USER" ] && [ -n "$DB_NAME" ]; then
-    PGPASSWORD=$DB_PASSWORD pg_dump -h ${DB_HOST:-localhost} -U $DB_USER -d $DB_NAME > "$BACKUP_FILE"
-    
-    if [ $? -eq 0 ]; then
-        BACKUP_SIZE=$(du -h "$BACKUP_FILE" | cut -f1)
-        echo "✅ Backup created: $(basename $BACKUP_FILE) ($BACKUP_SIZE)"
-    else
-        echo "❌ Backup failed! Aborting update."
-        exit 1
-    fi
+echo
+echo -e "${BLUE}💾 Creating database backup...${NC}"
+BACKUP_FILE="/tmp/bcinv_backup_$(date +%Y%m%d_%H%M%S).sql"
+if su - postgres -c "pg_dump bcinv > $BACKUP_FILE" 2>/dev/null; then
+    echo -e "${GREEN}✓ Backup created: $BACKUP_FILE${NC}"
 else
-    echo "⚠️  Database credentials not found in .env"
-    echo "Proceeding without backup (not recommended)"
-    read -p "Continue anyway? [y/N] " -n 1 -r
-    echo ""
-    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-        exit 1
-    fi
+    echo -e "${YELLOW}⚠️  Backup failed (continuing anyway)${NC}"
 fi
 
-echo ""
+echo -e "${YELLOW}🛑 Stopping services...${NC}"
+systemctl stop bcinv-api bcinv-worker
+echo -e "${GREEN}✓ Services stopped${NC}"
 
-# Pull changes
-echo "📥 Pulling code updates..."
-git pull origin main
-
-if [ $? -ne 0 ]; then
-    echo "❌ Failed to pull changes"
-    echo ""
-    echo "Rollback: git reset --hard $LOCAL"
+echo -e "${YELLOW}⬇️  Pulling latest code...${NC}"
+if git pull origin $CURRENT_BRANCH; then
+    echo -e "${GREEN}✓ Code updated${NC}"
+else
+    echo -e "${RED}✖ Failed to pull changes${NC}"
+    echo -e "${YELLOW}Restarting services...${NC}"
+    systemctl start bcinv-api bcinv-worker
     exit 1
 fi
 
-echo "✅ Code updated"
-echo ""
-
-# Update dependencies if package.json changed
-if git diff HEAD@{1} HEAD --name-only | grep -q "package.json\|package-lock.json"; then
-    echo "📦 Updating dependencies..."
-    npm install --production
-    
-    if [ $? -ne 0 ]; then
-        echo "❌ Dependency installation failed"
-        echo ""
-        echo "Rollback:"
-        echo "  git reset --hard $LOCAL"
-        echo "  npm install"
-        exit 1
-    fi
-    
-    echo "✓ Dependencies updated"
+echo -e "${YELLOW}📦 Checking for dependency updates...${NC}"
+if npm install --production; then
+    echo -e "${GREEN}✓ Dependencies updated${NC}"
 else
-    echo "✓ No dependency updates needed"
-fi
-
-echo ""
-
-# Run migrations if schema changed
-if git diff HEAD@{1} HEAD --name-only | grep -q "database/\|migrations/"; then
-    echo "🗄️  Running database migrations..."
-    
-    if [ -f "migrations/migrate.js" ]; then
-        node migrations/migrate.js
-    elif [ -f "database/schema.sql" ]; then
-        PGPASSWORD=$DB_PASSWORD psql -h ${DB_HOST:-localhost} -U $DB_USER -d $DB_NAME -f database/schema.sql
-    fi
-    
-    echo "✓ Migrations complete"
-else
-    echo "✓ No database changes"
-fi
-
-echo ""
-
-# Restart services
-echo "🔄 Restarting services..."
-echo ""
-
-if [ -n "$SUDO_CMD" ]; then
-    $SUDO_CMD systemctl restart bcinv-api
-    $SUDO_CMD systemctl restart bcinv-worker
-else
-    systemctl restart bcinv-api
-    systemctl restart bcinv-worker
-fi
-
-if [ $? -ne 0 ]; then
-    echo "❌ Failed to restart services"
-    echo ""
-    echo "Manual restart:"
-    if [ -n "$SUDO_CMD" ]; then
-        echo "  sudo systemctl restart bcinv-api bcinv-worker"
-    else
-        echo "  systemctl restart bcinv-api bcinv-worker"
-    fi
+    echo -e "${RED}✖ Dependency update failed${NC}"
     exit 1
 fi
 
-echo "✅ Services restarted"
-echo ""
-
-# Wait for services
-echo "Waiting for services to start..."
-sleep 3
-echo ""
-
-echo "========================================"
-echo "✅ Update Complete!"
-echo "========================================"
-echo ""
-
-# Show service status
-echo "📊 Service Status:"
-if [ -n "$SUDO_CMD" ]; then
-    $SUDO_CMD systemctl status bcinv-api --no-pager -l | head -10
-    echo ""
-    $SUDO_CMD systemctl status bcinv-worker --no-pager -l | head -10
-else
-    systemctl status bcinv-api --no-pager -l | head -10
-    echo ""
-    systemctl status bcinv-worker --no-pager -l | head -10
-fi
-
-echo ""
-echo "💾 Backup saved: $(basename $BACKUP_FILE)"
-echo ""
-echo "🔗 Quick Actions:"
-echo "  • View logs: journalctl -u bcinv-api -f"
-echo "  • Check app: curl http://localhost:3000"
-if [ -n "$BACKUP_FILE" ]; then
-    echo "  • Rollback: git reset --hard $LOCAL && npm install"
-    echo "             && PGPASSWORD=\$DB_PASSWORD psql -U $DB_USER -d $DB_NAME < $BACKUP_FILE"
-    if [ -n "$SUDO_CMD" ]; then
-        echo "             && sudo systemctl restart bcinv-api bcinv-worker"
+echo -e "${YELLOW}🗄️  Running database migrations...${NC}"
+if [ -d "migrations" ]; then
+    MIGRATION_COUNT=0
+    for migration in migrations/*.sql; do
+        if [ -f "$migration" ]; then
+            echo -e "  ${BLUE}Running: $(basename $migration)${NC}"
+            if su - postgres -c "psql -d bcinv -f $migration" 2>/dev/null; then
+                echo -e "  ${GREEN}✓ Success${NC}"
+                ((MIGRATION_COUNT++))
+            else
+                echo -e "  ${YELLOW}⚠️  Already applied or failed${NC}"
+            fi
+        fi
+    done
+    if [ $MIGRATION_COUNT -gt 0 ]; then
+        echo -e "${GREEN}✓ Applied $MIGRATION_COUNT migration(s)${NC}"
     else
-        echo "             && systemctl restart bcinv-api bcinv-worker"
+        echo -e "${BLUE}No new migrations to apply${NC}"
     fi
+else
+    echo -e "${BLUE}No migrations directory found${NC}"
 fi
-echo ""
-echo "🎉 Update successful!"
-echo ""
+
+echo -e "${YELLOW}🔄 Starting services...${NC}"
+systemctl start bcinv-api bcinv-worker
+echo -e "${GREEN}✓ Services started${NC}"
+
+echo -e "${YELLOW}⏳ Waiting for services to be ready...${NC}"
+sleep 5
+
+# Verify services
+API_STATUS=$(systemctl is-active bcinv-api 2>/dev/null)
+WORKER_STATUS=$(systemctl is-active bcinv-worker 2>/dev/null)
+
+if [ "$API_STATUS" = "active" ] && [ "$WORKER_STATUS" = "active" ]; then
+    echo -e "${GREEN}✓ Services started successfully${NC}"
+else
+    echo -e "${RED}✖ Service startup issues detected${NC}"
+    echo -e "${YELLOW}API Status: $API_STATUS${NC}"
+    echo -e "${YELLOW}Worker Status: $WORKER_STATUS${NC}"
+    echo -e "${YELLOW}Check logs: journalctl -u bcinv-api -n 50${NC}"
+    exit 1
+fi
+
+echo
+echo -e "${CYAN}═══════════════════════════════════════════════════════════${NC}"
+echo -e "${GREEN}✅ Update Complete!${NC}"
+echo -e "${CYAN}═══════════════════════════════════════════════════════════${NC}"
+echo
+
+# Get new version info
+NEW_COMMIT=$(git rev-parse --short HEAD 2>/dev/null)
+NEW_MESSAGE=$(git log -1 --pretty=%B 2>/dev/null | head -1)
+IP=$(hostname -I | awk '{print $1}')
+
+echo -e "${BLUE}📊 New Status${NC}"
+echo -e "  Branch: ${MAGENTA}${CURRENT_BRANCH}${NC}"
+echo -e "  Commit: ${MAGENTA}${NEW_COMMIT}${NC}"
+echo -e "  Message: ${MAGENTA}${NEW_MESSAGE}${NC}"
+echo -e "  API Service: ${GREEN}${API_STATUS}${NC}"
+echo -e "  Worker Service: ${GREEN}${WORKER_STATUS}${NC}"
+echo
+echo -e "${GREEN}💡 Access your application:${NC}"
+echo -e "  ${CYAN}http://${IP}:3000${NC}"
+echo
+echo -e "${BLUE}💡 Useful commands:${NC}"
+echo -e "  View logs: ${CYAN}journalctl -u bcinv-api -f${NC}"
+echo -e "  Restart: ${CYAN}systemctl restart bcinv-api bcinv-worker${NC}"
+echo -e "  Status: ${CYAN}systemctl status bcinv-api bcinv-worker${NC}"
+echo
+echo -e "${CYAN}═══════════════════════════════════════════════════════════${NC}"
+echo
