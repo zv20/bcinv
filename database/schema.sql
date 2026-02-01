@@ -60,15 +60,15 @@ CREATE TABLE IF NOT EXISTS discarded_items (
 );
 
 -- Create indexes for performance (important for 10k-20k products)
-CREATE INDEX idx_products_sku ON products(sku);
-CREATE INDEX idx_products_category ON products(category);
-CREATE INDEX idx_products_name ON products(name);
-CREATE INDEX idx_stock_product ON stock_batches(product_id);
-CREATE INDEX idx_stock_location ON stock_batches(location_id);
-CREATE INDEX idx_stock_expiry ON stock_batches(expiry_date);
-CREATE INDEX idx_stock_status ON stock_batches(status);
-CREATE INDEX idx_audit_product ON audit_log(product_id);
-CREATE INDEX idx_audit_created ON audit_log(created_at);
+CREATE INDEX IF NOT EXISTS idx_products_sku ON products(sku);
+CREATE INDEX IF NOT EXISTS idx_products_category ON products(category);
+CREATE INDEX IF NOT EXISTS idx_products_name ON products(name);
+CREATE INDEX IF NOT EXISTS idx_stock_product ON stock_batches(product_id);
+CREATE INDEX IF NOT EXISTS idx_stock_location ON stock_batches(location_id);
+CREATE INDEX IF NOT EXISTS idx_stock_expiry ON stock_batches(expiry_date);
+CREATE INDEX IF NOT EXISTS idx_stock_status ON stock_batches(status);
+CREATE INDEX IF NOT EXISTS idx_audit_product ON audit_log(product_id);
+CREATE INDEX IF NOT EXISTS idx_audit_created ON audit_log(created_at);
 
 -- View: Current stock summary by product
 CREATE OR REPLACE VIEW v_current_stock AS
@@ -97,7 +97,7 @@ SELECT
     sb.quantity,
     sb.expiry_date,
     l.name as location_name,
-    EXTRACT(DAY FROM (sb.expiry_date - CURRENT_DATE)) as days_until_expiry
+    EXTRACT(DAY FROM (sb.expiry_date::timestamp - CURRENT_DATE::timestamp)) as days_until_expiry
 FROM stock_batches sb
 JOIN products p ON sb.product_id = p.id
 LEFT JOIN locations l ON sb.location_id = l.id
@@ -105,3 +105,13 @@ WHERE sb.status = 'active'
     AND sb.expiry_date IS NOT NULL
     AND sb.expiry_date <= CURRENT_DATE + INTERVAL '7 days'
 ORDER BY sb.expiry_date ASC;
+
+-- Grant permissions to bcinv user
+GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO bcinv;
+GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO bcinv;
+GRANT ALL PRIVILEGES ON ALL VIEWS IN SCHEMA public TO bcinv;
+
+-- Set default privileges for future objects
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO bcinv;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO bcinv;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON VIEWS TO bcinv;
