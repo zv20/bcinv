@@ -124,19 +124,32 @@ function get_user_input() {
         case $NET_CHOICE in
             1)
                 IP_CONFIG="dhcp"
-                GATEWAY=""
                 echo -e "${GREEN}✓ Using DHCP${NC}"
                 break
                 ;;
             2)
-                read -p "IP Address/CIDR (e.g., 192.168.1.100/24): " STATIC_IP
-                if [[ ! $STATIC_IP =~ ^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}/[0-9]{1,2}$ ]]; then
-                    echo -e "${RED}✖ Invalid IP format${NC}"
-                    continue
-                fi
-                read -p "Gateway (e.g., 192.168.1.1): " GATEWAY
-                IP_CONFIG="$STATIC_IP,gw=$GATEWAY"
-                echo -e "${GREEN}✓ Static IP configured${NC}"
+                while true; do
+                    read -p "IP Address/CIDR (e.g., 192.168.1.100/24): " STATIC_IP
+                    if [[ ! $STATIC_IP =~ ^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}/[0-9]{1,2}$ ]]; then
+                        echo -e "${RED}✖ Invalid IP format${NC}"
+                        continue
+                    fi
+                    
+                    read -p "Gateway (e.g., 192.168.1.1): " GATEWAY
+                    if [ -z "$GATEWAY" ]; then
+                        echo -e "${RED}✖ Gateway is required for static IP${NC}"
+                        continue
+                    fi
+                    
+                    if [[ ! $GATEWAY =~ ^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$ ]]; then
+                        echo -e "${RED}✖ Invalid gateway format${NC}"
+                        continue
+                    fi
+                    
+                    IP_CONFIG="$STATIC_IP,gw=$GATEWAY"
+                    echo -e "${GREEN}✓ Static IP configured: $STATIC_IP via $GATEWAY${NC}"
+                    break
+                done
                 break
                 ;;
             *)
@@ -159,6 +172,7 @@ function get_user_input() {
     echo -e "  Disk: ${MAGENTA}${DISK_SIZE}GB${NC}"
     echo -e "  Memory: ${MAGENTA}${MEMORY}MB${NC}"
     echo -e "  CPU Cores: ${MAGENTA}$CORES${NC}"
+    echo -e "  Network: ${MAGENTA}$IP_CONFIG${NC}"
     echo -e "  Storage: ${MAGENTA}$STORAGE${NC}"
     echo -e "${CYAN}═══════════════════════════════════════════════════════════${NC}\n"
     
