@@ -380,7 +380,6 @@ systemctl enable postgresql
 su - postgres -c "psql -c \"CREATE DATABASE bcinv;\""
 su - postgres -c "psql -c \"CREATE USER bcinv WITH PASSWORD 'bcinv123';\""
 su - postgres -c "psql -c \"GRANT ALL PRIVILEGES ON DATABASE bcinv TO bcinv;\""
-su - postgres -c "psql -d bcinv -c \"GRANT ALL ON SCHEMA public TO bcinv;\""
 
 echo "Cloning BC Inventory repository (branch: SELECTED_BRANCH)..."
 cd /opt
@@ -392,6 +391,23 @@ npm install --production
 
 echo "Setting up database schema..."
 su - postgres -c "psql -d bcinv -f /opt/bcinv/database/schema.sql"
+
+echo "Fixing database permissions..."
+su - postgres -c "psql -d bcinv" << 'PERMEOF'
+-- Grant all permissions on all tables to bcinv user
+GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO bcinv;
+
+-- Grant permissions on sequences (for auto-increment IDs)
+GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO bcinv;
+
+-- Grant permissions on views
+GRANT ALL PRIVILEGES ON ALL VIEWS IN SCHEMA public TO bcinv;
+
+-- Set default privileges for future tables
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO bcinv;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO bcinv;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON VIEWS TO bcinv;
+PERMEOF
 
 echo "Creating systemd service..."
 cat > /etc/systemd/system/bcinv-api.service << 'EOF'
