@@ -1,11 +1,33 @@
 -- BC Inventory Database Schema
 -- Optimized for 10,000-20,000 products with audit tracking
 
+-- Departments table (for product categorization)
+CREATE TABLE IF NOT EXISTS departments (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(100) NOT NULL UNIQUE,
+    description TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Suppliers table
+CREATE TABLE IF NOT EXISTS suppliers (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(255) NOT NULL UNIQUE,
+    contact_name VARCHAR(255),
+    phone VARCHAR(50),
+    email VARCHAR(255),
+    address TEXT,
+    notes TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
 -- Products table
 CREATE TABLE IF NOT EXISTS products (
     id SERIAL PRIMARY KEY,
     name VARCHAR(255) NOT NULL,
-    category VARCHAR(100),
+    department_id INTEGER REFERENCES departments(id) ON DELETE SET NULL,
+    supplier_id INTEGER REFERENCES suppliers(id) ON DELETE SET NULL,
+    category VARCHAR(100),  -- Legacy field, kept for backward compatibility
     sku VARCHAR(50) UNIQUE,
     unit VARCHAR(20) DEFAULT 'units',
     description TEXT,
@@ -63,6 +85,10 @@ CREATE TABLE IF NOT EXISTS discarded_items (
 CREATE INDEX IF NOT EXISTS idx_products_sku ON products(sku);
 CREATE INDEX IF NOT EXISTS idx_products_category ON products(category);
 CREATE INDEX IF NOT EXISTS idx_products_name ON products(name);
+CREATE INDEX IF NOT EXISTS idx_products_department ON products(department_id);
+CREATE INDEX IF NOT EXISTS idx_products_supplier ON products(supplier_id);
+CREATE INDEX IF NOT EXISTS idx_departments_name ON departments(name);
+CREATE INDEX IF NOT EXISTS idx_suppliers_name ON suppliers(name);
 CREATE INDEX IF NOT EXISTS idx_stock_product ON stock_batches(product_id);
 CREATE INDEX IF NOT EXISTS idx_stock_location ON stock_batches(location_id);
 CREATE INDEX IF NOT EXISTS idx_stock_expiry ON stock_batches(expiry_date);
