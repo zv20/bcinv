@@ -81,7 +81,17 @@ async function editProduct(product) {
     document.getElementById('editProductId').value = product.id;
     document.getElementById('editProductName').value = product.name;
     document.getElementById('editProductSku').value = product.sku || '';
-    document.getElementById('editProductUnit').value = product.unit || '';
+    
+    // Parse unit value - convert text to empty or extract number
+    let unitValue = '';
+    if (product.unit) {
+        const parsed = parseFloat(product.unit);
+        if (!isNaN(parsed)) {
+            unitValue = parsed;
+        }
+    }
+    document.getElementById('editProductUnit').value = unitValue;
+    
     document.getElementById('editProductPrice').value = product.cost_price || '';
     new bootstrap.Modal(document.getElementById('editProductModal')).show();
 }
