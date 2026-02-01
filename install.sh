@@ -17,10 +17,14 @@ fi
 
 echo "[1/7] Installing system dependencies..."
 apt update
-apt install -y postgresql postgresql-contrib nodejs npm git curl
+# Node.js 20 from NodeSource already includes npm - don't install Debian's npm package
+apt install -y postgresql postgresql-contrib git curl
 
 echo ""
 echo "[2/7] Setting up database..."
+systemctl start postgresql
+systemctl enable postgresql
+
 DB_PASSWORD=$(openssl rand -base64 24)
 
 sudo -u postgres psql << EOF
@@ -29,14 +33,16 @@ DROP USER IF EXISTS bcinv_user;
 CREATE DATABASE bcinv;
 CREATE USER bcinv_user WITH ENCRYPTED PASSWORD '$DB_PASSWORD';
 GRANT ALL PRIVILEGES ON DATABASE bcinv TO bcinv_user;
-\q
+\c bcinv
+GRANT ALL ON SCHEMA public TO bcinv_user;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO bcinv_user;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO bcinv_user;
 EOF
 
+echo "✓ Database created"
+
 echo ""
-echo "[3/7] Cloning application..."
-rm -rf /opt/bcinv
-mkdir -p /opt/bcinv
-git clone https://github.com/zv20/bcinv.git /opt/bcinv
+echo "[3/7] Installing application..."
 cd /opt/bcinv
 
 echo ""
@@ -45,7 +51,7 @@ npm install --production
 
 echo ""
 echo "[5/7] Creating database schema..."
-sudo -u postgres psql -d bcinv -f database/schema.sql
+PGPASSWORD=$DB_PASSWORD psql -h localhost -U bcinv_user -d bcinv -f database/schema.sql
 
 echo ""
 echo "[6/7] Configuring application..."
@@ -59,10 +65,11 @@ PORT=3000
 EOF
 chmod 600 .env
 
-cat > /etc/systemd/system/bcinv-api.service << 'EOF'
+cat > /etc/systemd/system/bcinv-api.service << 'SERVICEEOF'
 [Unit]
 Description=BC Inventory Management API
 After=network.target postgresql.service
+Requires=postgresql.service
 
 [Service]
 Type=simple
@@ -72,10 +79,12 @@ EnvironmentFile=/opt/bcinv/.env
 ExecStart=/usr/bin/node /opt/bcinv/src/server.js
 Restart=always
 RestartSec=10
+StandardOutput=journal
+StandardError=journal
 
 [Install]
 WantedBy=multi-user.target
-EOF
+SERVICEEOF
 
 echo ""
 echo "[7/7] Starting service..."
@@ -83,6 +92,7 @@ systemctl daemon-reload
 systemctl enable bcinv-api
 systemctl start bcinv-api
 
+echo "Waiting for service to start..."
 sleep 3
 
 if systemctl is-active --quiet bcinv-api; then
@@ -92,25 +102,27 @@ if systemctl is-active --quiet bcinv-api; then
     echo "✓ INSTALLATION SUCCESSFUL!"
     echo "====================================="
     echo ""
-    echo "Your BC Inventory Management System is ready!"
+    echo "BC Inventory Management is running!"
     echo ""
     echo "Access URL: http://$SERVER_IP:3000"
     echo ""
-    echo "Database credentials saved to: /opt/bcinv/.env"
-    echo "Database password: $DB_PASSWORD"
+    echo "Database Info:"
+    echo "  • Credentials saved to: /opt/bcinv/.env"
+    echo "  • Database: bcinv"
+    echo "  • User: bcinv_user"
     echo ""
-    echo "Default data includes:"
+    echo "Pre-loaded Data:"
     echo "  • 4 departments (General, Food, Beverages, Supplies)"
     echo "  • 3 warehouse locations"
     echo ""
-    echo "Useful commands:"
-    echo "  • Check status: sudo systemctl status bcinv-api"
-    echo "  • View logs: sudo journalctl -u bcinv-api -f"
-    echo "  • Restart: sudo systemctl restart bcinv-api"
+    echo "Useful Commands:"
+    echo "  • Check status: systemctl status bcinv-api"
+    echo "  • View logs: journalctl -u bcinv-api -f"
+    echo "  • Restart: systemctl restart bcinv-api"
     echo ""
 else
     echo ""
-    echo "✗ Installation completed but service failed to start"
-    echo "Check logs: sudo journalctl -u bcinv-api -n 50"
+    echo "✗ Service failed to start"
+    echo "Check logs: journalctl -u bcinv-api -n 50"
     exit 1
 fi
