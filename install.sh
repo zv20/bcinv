@@ -1,6 +1,6 @@
 #!/bin/bash
 # BC Inventory Management - Automated Installation Script
-# Run as: curl -sSL https://raw.githubusercontent.com/zv20/bcinv/main/install.sh | sudo bash
+# Run as: curl -sSL https://raw.githubusercontent.com/zv20/bcinv/main/install.sh | bash
 
 set -e
 
@@ -11,7 +11,7 @@ echo ""
 
 # Check if running as root
 if [ "$EUID" -ne 0 ]; then 
-    echo "Error: Please run as root (use sudo)"
+    echo "Error: Please run as root (use sudo or run in container as root)"
     exit 1
 fi
 
@@ -27,7 +27,8 @@ systemctl enable postgresql
 
 DB_PASSWORD=$(openssl rand -base64 24)
 
-sudo -u postgres psql << EOF
+# Use su instead of sudo (works in minimal containers without sudo)
+su - postgres -c "psql" << EOF
 DROP DATABASE IF EXISTS bcinv;
 DROP USER IF EXISTS bcinv_user;
 CREATE DATABASE bcinv;
