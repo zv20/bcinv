@@ -64,21 +64,36 @@ class PerformanceOptimizer {
             return this.pendingRequests.get(key);
         }
 
-        // Check cache first
+        // Check cache first - return a cloned Response for cached data
         if (this.cache.has(key)) {
             const cached = this.cache.get(key);
             if (Date.now() - cached.timestamp < 60000) { // 1 minute cache
-                return Promise.resolve(cached.data);
+                // Return a Response object with cached data so .json() works
+                return Promise.resolve(new Response(JSON.stringify(cached.data), {
+                    status: 200,
+                    headers: { 'Content-Type': 'application/json' }
+                }));
             }
         }
 
         // Make new request using ORIGINAL fetch (bound to window)
         const promise = this.originalFetch(url, options)
-            .then(response => response.json())
-            .then(data => {
-                this.cache.set(key, { data, timestamp: Date.now() });
+            .then(async response => {
+                // Clone response so we can cache the data
+                const clonedResponse = response.clone();
+                
+                // Only cache successful responses
+                if (response.ok) {
+                    try {
+                        const data = await clonedResponse.json();
+                        this.cache.set(key, { data, timestamp: Date.now() });
+                    } catch (e) {
+                        // Failed to parse JSON, don't cache
+                    }
+                }
+                
                 this.pendingRequests.delete(key);
-                return data;
+                return response; // Return original Response object
             })
             .catch(error => {
                 this.pendingRequests.delete(key);
