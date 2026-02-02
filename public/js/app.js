@@ -69,7 +69,11 @@ async function addProduct() {
     const data = Object.fromEntries(new FormData(form));
     try {
         const response = await fetch(`${API_URL}/products`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
-        if (response.ok) { bootstrap.Modal.getInstance(document.getElementById('addProductModal')).hide(); loadProducts(); alert('Product added!'); }
+        if (response.ok) { 
+            bootstrap.Modal.getInstance(document.getElementById('addProductModal')).hide(); 
+            await loadProducts(); 
+            alert('Product added!'); 
+        }
         else { alert('Error: ' + (await response.json()).error); }
     } catch (error) { alert('Failed to add product'); }
 }
@@ -102,7 +106,11 @@ async function updateProduct() {
     const id = data.id; delete data.id;
     try {
         const response = await fetch(`${API_URL}/products/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
-        if (response.ok) { bootstrap.Modal.getInstance(document.getElementById('editProductModal')).hide(); loadProducts(); alert('Product updated!'); }
+        if (response.ok) { 
+            bootstrap.Modal.getInstance(document.getElementById('editProductModal')).hide(); 
+            await loadProducts(); 
+            alert('Product updated!'); 
+        }
         else { alert('Error: ' + (await response.json()).error); }
     } catch (error) { alert('Failed to update product'); }
 }
@@ -111,7 +119,8 @@ async function deleteProduct(id, name) {
     if (!confirm(`Delete "${name}"?`)) return;
     try {
         await fetch(`${API_URL}/products/${id}`, { method: 'DELETE' });
-        loadProducts(); alert('Deleted');
+        await loadProducts(); 
+        alert('Deleted');
     } catch (error) { console.error('Delete error:', error); }
 }
 
@@ -140,7 +149,11 @@ async function addStock() {
     Object.keys(data).forEach(k => !data[k] && delete data[k]);
     try {
         const response = await fetch(`${API_URL}/stock/add`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
-        if (response.ok) { bootstrap.Modal.getInstance(document.getElementById('addStockModal')).hide(); loadStock(); alert('Stock added!'); }
+        if (response.ok) { 
+            bootstrap.Modal.getInstance(document.getElementById('addStockModal')).hide(); 
+            await loadStock(); 
+            alert('Stock added!'); 
+        }
         else { alert('Error: ' + (await response.json()).error); }
     } catch (error) { alert('Failed to add stock'); }
 }
@@ -151,7 +164,8 @@ async function adjustStock(batchId, productName, currentQty) {
     const notes = prompt('Reason (optional):');
     try {
         await fetch(`${API_URL}/stock/adjust`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ batch_id: batchId, quantity: parseFloat(newQty), reason: 'manual_audit', notes }) });
-        loadStock(); alert('Adjusted');
+        await loadStock(); 
+        alert('Adjusted');
     } catch (error) { console.error('Adjust error:', error); }
 }
 
@@ -162,7 +176,8 @@ async function discardStock(batchId, productName, quantity) {
     if (!qtyToDiscard) return;
     try {
         await fetch(`${API_URL}/stock/discard`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ batch_id: batchId, quantity: parseFloat(qtyToDiscard), reason: {'1': 'expired', '2': 'damaged', '3': 'other'}[reason] || 'other', notes: '' }) });
-        loadStock(); alert('Discarded');
+        await loadStock(); 
+        alert('Discarded');
     } catch (error) { console.error('Discard error:', error); }
 }
 
@@ -191,7 +206,11 @@ async function addDepartment() {
     const data = Object.fromEntries(new FormData(document.getElementById('addDepartmentForm')));
     try {
         const response = await fetch(`${API_URL}/departments`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
-        if (response.ok) { bootstrap.Modal.getInstance(document.getElementById('addDepartmentModal')).hide(); loadDepartments(); alert('Department added!'); }
+        if (response.ok) { 
+            bootstrap.Modal.getInstance(document.getElementById('addDepartmentModal')).hide(); 
+            await loadDepartments(); 
+            alert('Department added!'); 
+        }
         else { alert('Error: ' + (await response.json()).error); }
     } catch (error) { alert('Failed to add department'); }
 }
@@ -208,13 +227,19 @@ async function updateDepartment() {
     const data = { name: document.getElementById('editDepartmentName').value, description: document.getElementById('editDepartmentDescription').value };
     try {
         await fetch(`${API_URL}/departments/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
-        bootstrap.Modal.getInstance(document.getElementById('editDepartmentModal')).hide(); loadDepartments(); alert('Updated!');
+        bootstrap.Modal.getInstance(document.getElementById('editDepartmentModal')).hide(); 
+        await loadDepartments(); 
+        alert('Updated!');
     } catch (error) { alert('Failed to update'); }
 }
 
 async function deleteDepartment(id, name) {
     if (!confirm(`Delete "${name}"?`)) return;
-    try { await fetch(`${API_URL}/departments/${id}`, { method: 'DELETE' }); loadDepartments(); alert('Deleted'); }
+    try { 
+        await fetch(`${API_URL}/departments/${id}`, { method: 'DELETE' }); 
+        await loadDepartments(); 
+        alert('Deleted'); 
+    }
     catch (error) { console.error('Delete error:', error); }
 }
 
@@ -232,7 +257,11 @@ async function addSupplier() {
     const data = Object.fromEntries(new FormData(document.getElementById('addSupplierForm')));
     try {
         const response = await fetch(`${API_URL}/suppliers`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
-        if (response.ok) { bootstrap.Modal.getInstance(document.getElementById('addSupplierModal')).hide(); loadSuppliers(); alert('Supplier added!'); }
+        if (response.ok) { 
+            bootstrap.Modal.getInstance(document.getElementById('addSupplierModal')).hide(); 
+            await loadSuppliers(); 
+            alert('Supplier added!'); 
+        }
         else { alert('Error: ' + (await response.json()).error); }
     } catch (error) { alert('Failed to add supplier'); }
 }
@@ -253,13 +282,19 @@ async function updateSupplier() {
     const data = { name: document.getElementById('editSupplierName').value, contact_name: document.getElementById('editSupplierContact').value, phone: document.getElementById('editSupplierPhone').value, email: document.getElementById('editSupplierEmail').value, address: document.getElementById('editSupplierAddress').value, notes: document.getElementById('editSupplierNotes').value };
     try {
         await fetch(`${API_URL}/suppliers/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
-        bootstrap.Modal.getInstance(document.getElementById('editSupplierModal')).hide(); loadSuppliers(); alert('Updated!');
+        bootstrap.Modal.getInstance(document.getElementById('editSupplierModal')).hide(); 
+        await loadSuppliers(); 
+        alert('Updated!');
     } catch (error) { alert('Failed to update'); }
 }
 
 async function deleteSupplier(id, name) {
     if (!confirm(`Delete "${name}"?`)) return;
-    try { await fetch(`${API_URL}/suppliers/${id}`, { method: 'DELETE' }); loadSuppliers(); alert('Deleted'); }
+    try { 
+        await fetch(`${API_URL}/suppliers/${id}`, { method: 'DELETE' }); 
+        await loadSuppliers(); 
+        alert('Deleted'); 
+    }
     catch (error) { console.error('Delete error:', error); }
 }
 
@@ -277,7 +312,11 @@ async function addLocation() {
     const data = Object.fromEntries(new FormData(document.getElementById('addLocationForm')));
     try {
         const response = await fetch(`${API_URL}/locations`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
-        if (response.ok) { bootstrap.Modal.getInstance(document.getElementById('addLocationModal')).hide(); loadLocations(); alert('Location added!'); }
+        if (response.ok) { 
+            bootstrap.Modal.getInstance(document.getElementById('addLocationModal')).hide(); 
+            await loadLocations(); 
+            alert('Location added!'); 
+        }
         else { alert('Error: ' + (await response.json()).error); }
     } catch (error) { alert('Failed to add location'); }
 }
@@ -295,12 +334,18 @@ async function updateLocation() {
     const data = { name: document.getElementById('editLocationName').value, section: document.getElementById('editLocationSection').value, description: document.getElementById('editLocationDescription').value };
     try {
         await fetch(`${API_URL}/locations/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
-        bootstrap.Modal.getInstance(document.getElementById('editLocationModal')).hide(); loadLocations(); alert('Updated!');
+        bootstrap.Modal.getInstance(document.getElementById('editLocationModal')).hide(); 
+        await loadLocations(); 
+        alert('Updated!');
     } catch (error) { alert('Failed to update'); }
 }
 
 async function deleteLocation(id, name) {
     if (!confirm(`Delete "${name}"?`)) return;
-    try { await fetch(`${API_URL}/locations/${id}`, { method: 'DELETE' }); loadLocations(); alert('Deleted'); }
+    try { 
+        await fetch(`${API_URL}/locations/${id}`, { method: 'DELETE' }); 
+        await loadLocations(); 
+        alert('Deleted'); 
+    }
     catch (error) { console.error('Delete error:', error); }
 }
