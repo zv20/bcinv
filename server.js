@@ -3,7 +3,9 @@ const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
 const path = require('path');
+const cookieParser = require('cookie-parser');
 const { pool, logger } = require('./lib/db');
+const { deviceDetector, setDevicePreference } = require('./lib/device-detector');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -15,9 +17,14 @@ app.use(helmet({
 app.use(cors());
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+app.use(cookieParser());
+
+// Device detection middleware
+app.use(deviceDetector);
+app.use(setDevicePreference);
 
 app.use((req, res, next) => {
-  logger.info(`${req.method} ${req.path}`);
+  logger.info(`${req.method} ${req.path} [${req.device.type}]`);
   next();
 });
 
@@ -52,6 +59,11 @@ app.get('/api/dashboard', async (req, res) => {
     logger.error('Dashboard error:', error);
     res.status(500).json({ error: 'Failed to fetch dashboard stats' });
   }
+});
+
+// Device info endpoint
+app.get('/api/device', (req, res) => {
+  res.json(req.device);
 });
 
 // Products endpoints
@@ -96,6 +108,70 @@ app.get('/api/products', async (req, res) => {
   }
 });
 
+// Product search endpoint (enhanced for mobile)
+app.get('/api/products/search', async (req, res) => {
+  try {
+    const { q, limit = 20 } = req.query;
+    
+    if (!q || q.trim().length < 2) {
+      return res.json({ results: [], query: q });
+    }
+    
+    const searchTerm = q.trim();
+    
+    // Search across name, SKU, barcode, and description
+    // Use ts_rank for relevance scoring when possible
+    const query = `
+      SELECT 
+        p.id,
+        p.name,
+        p.sku,
+        p.barcode,
+        p.category,
+        p.unit,
+        d.name as department_name,
+        l.name as location_name,
+        COALESCE(SUM(sb.quantity), 0)::INTEGER as total_stock,
+        MIN(sb.expiry_date) as nearest_expiry,
+        -- Relevance scoring
+        CASE
+          WHEN p.barcode = $1 THEN 100
+          WHEN p.sku = $1 THEN 90
+          WHEN p.name ILIKE $1 THEN 80
+          WHEN p.name ILIKE $2 THEN 70
+          WHEN p.sku ILIKE $2 THEN 60
+          WHEN p.barcode ILIKE $2 THEN 50
+          ELSE 40
+        END as relevance
+      FROM products p
+      LEFT JOIN departments d ON p.department_id = d.id
+      LEFT JOIN stock_batches sb ON p.id = sb.product_id AND sb.status = 'active'
+      LEFT JOIN locations l ON sb.location_id = l.id
+      WHERE 
+        p.name ILIKE $2 OR
+        p.sku ILIKE $2 OR
+        p.barcode ILIKE $2 OR
+        p.description ILIKE $2 OR
+        p.barcode = $1 OR
+        p.sku = $1
+      GROUP BY p.id, p.name, p.sku, p.barcode, p.category, p.unit, d.name, l.name
+      ORDER BY relevance DESC, p.name ASC
+      LIMIT $3
+    `;
+    
+    const result = await pool.query(query, [searchTerm, `%${searchTerm}%`, parseInt(limit)]);
+    
+    res.json({
+      results: result.rows,
+      query: searchTerm,
+      count: result.rows.length
+    });
+  } catch (error) {
+    logger.error('Product search error:', error);
+    res.status(500).json({ error: 'Search failed', results: [] });
+  }
+});
+
 app.get('/api/products/:id', async (req, res) => {
   try {
     const result = await pool.query('SELECT * FROM products WHERE id = $1', [req.params.id]);
@@ -123,7 +199,7 @@ app.get('/api/products/:id', async (req, res) => {
 });
 
 app.post('/api/products', async (req, res) => {
-  const { name, category, sku, unit, description, cost_price, department_id, supplier_id } = req.body;
+  const { name, category, sku, barcode, unit, description, cost_price, department_id, supplier_id } = req.body;
   
   if (!name) {
     return res.status(400).json({ error: 'Product name is required' });
@@ -131,13 +207,14 @@ app.post('/api/products', async (req, res) => {
   
   try {
     const result = await pool.query(
-      `INSERT INTO products (name, category, sku, unit, description, cost_price, department_id, supplier_id)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+      `INSERT INTO products (name, category, sku, barcode, unit, description, cost_price, department_id, supplier_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
        RETURNING *`,
       [
         name, 
         emptyToNull(category), 
-        emptyToNull(sku), 
+        emptyToNull(sku),
+        emptyToNull(barcode),
         unit || 'units', 
         emptyToNull(description), 
         emptyToNull(cost_price),
@@ -151,7 +228,7 @@ app.post('/api/products', async (req, res) => {
   } catch (error) {
     logger.error('Product creation error:', error);
     if (error.code === '23505') {
-      res.status(400).json({ error: 'SKU already exists' });
+      res.status(400).json({ error: 'SKU or barcode already exists' });
     } else {
       res.status(500).json({ error: 'Failed to create product' });
     }
@@ -159,7 +236,7 @@ app.post('/api/products', async (req, res) => {
 });
 
 app.put('/api/products/:id', async (req, res) => {
-  const { name, category, sku, unit, description, cost_price, department_id, supplier_id } = req.body;
+  const { name, category, sku, barcode, unit, description, cost_price, department_id, supplier_id } = req.body;
   
   try {
     const result = await pool.query(
@@ -167,18 +244,20 @@ app.put('/api/products/:id', async (req, res) => {
        SET name = COALESCE($1, name),
            category = $2,
            sku = $3,
-           unit = $4,
-           description = $5,
-           cost_price = $6,
-           department_id = $7,
-           supplier_id = $8,
+           barcode = $4,
+           unit = $5,
+           description = $6,
+           cost_price = $7,
+           department_id = $8,
+           supplier_id = $9,
            updated_at = CURRENT_TIMESTAMP
-       WHERE id = $9
+       WHERE id = $10
        RETURNING *`,
       [
         emptyToNull(name), 
         emptyToNull(category), 
-        emptyToNull(sku), 
+        emptyToNull(sku),
+        emptyToNull(barcode),
         emptyToNull(unit), 
         emptyToNull(description), 
         emptyToNull(cost_price),
