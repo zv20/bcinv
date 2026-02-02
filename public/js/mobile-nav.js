@@ -7,6 +7,8 @@ class MobileNav {
     this.currentPage = 'dashboard';
     this.cameraMenu = null;
     this.cameraMenuOverlay = null;
+    this.settingsMenu = null;
+    this.settingsMenuOverlay = null;
     this.init();
   }
 
@@ -72,6 +74,8 @@ class MobileNav {
 
     // Render camera action menu
     this.renderCameraMenu();
+    // Render settings menu
+    this.renderSettingsMenu();
   }
 
   renderCameraMenu() {
@@ -139,6 +143,60 @@ class MobileNav {
     this.cameraMenuOverlay = document.querySelector('.camera-menu-overlay');
   }
 
+  renderSettingsMenu() {
+    const menuHTML = `
+      <div class="settings-menu-overlay"></div>
+      <div class="settings-menu">
+        <h3 class="settings-menu-title">Settings</h3>
+        
+        <div class="settings-action-item" data-action="departments">
+          <div class="settings-action-icon">
+            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"/>
+            </svg>
+          </div>
+          <div class="settings-action-text">
+            <h4>Departments</h4>
+            <p>Manage product categories</p>
+          </div>
+        </div>
+        
+        <div class="settings-action-item" data-action="suppliers">
+          <div class="settings-action-icon">
+            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z"/>
+            </svg>
+          </div>
+          <div class="settings-action-text">
+            <h4>Suppliers</h4>
+            <p>Manage supplier contacts</p>
+          </div>
+        </div>
+        
+        <div class="settings-action-item" data-action="locations">
+          <div class="settings-action-icon">
+            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/>
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/>
+            </svg>
+          </div>
+          <div class="settings-action-text">
+            <h4>Locations</h4>
+            <p>Manage warehouse locations</p>
+          </div>
+        </div>
+      </div>
+    `;
+
+    document.body.insertAdjacentHTML('beforeend', menuHTML);
+    this.settingsMenu = document.querySelector('.settings-menu');
+    this.settingsMenuOverlay = document.querySelector('.settings-menu-overlay');
+  }
+
   attachEventListeners() {
     // Navigation item clicks
     document.querySelectorAll('.mobile-nav-item').forEach(item => {
@@ -148,6 +206,8 @@ class MobileNav {
         
         if (page === 'camera') {
           this.openCameraMenu();
+        } else if (page === 'settings') {
+          this.openSettingsMenu();
         } else if (page === 'search') {
           this.openSearchOverlay();
         } else {
@@ -163,11 +223,26 @@ class MobileNav {
       });
     }
 
+    // Settings menu overlay click to close
+    if (this.settingsMenuOverlay) {
+      this.settingsMenuOverlay.addEventListener('click', () => {
+        this.closeSettingsMenu();
+      });
+    }
+
     // Camera action item clicks
     document.querySelectorAll('.camera-action-item').forEach(item => {
       item.addEventListener('click', () => {
         const action = item.dataset.action;
         this.handleCameraAction(action);
+      });
+    });
+
+    // Settings action item clicks
+    document.querySelectorAll('.settings-action-item').forEach(item => {
+      item.addEventListener('click', () => {
+        const action = item.dataset.action;
+        this.handleSettingsAction(action);
       });
     });
   }
@@ -183,9 +258,6 @@ class MobileNav {
         break;
       case 'inventory':
         if (typeof showStock === 'function') showStock();
-        break;
-      case 'settings':
-        if (typeof showDepartments === 'function') showDepartments();
         break;
     }
   }
@@ -209,6 +281,16 @@ class MobileNav {
     this.cameraMenuOverlay.classList.remove('active');
   }
 
+  openSettingsMenu() {
+    this.settingsMenu.classList.add('active');
+    this.settingsMenuOverlay.classList.add('active');
+  }
+
+  closeSettingsMenu() {
+    this.settingsMenu.classList.remove('active');
+    this.settingsMenuOverlay.classList.remove('active');
+  }
+
   openSearchOverlay() {
     const event = new CustomEvent('openSearch');
     document.dispatchEvent(event);
@@ -223,6 +305,23 @@ class MobileNav {
 
     console.log(`Camera action: ${action}`);
     // TODO: Implement camera scanner in Sprint 2
+  }
+
+  handleSettingsAction(action) {
+    this.closeSettingsMenu();
+    
+    // Call the appropriate settings page function from app.js
+    switch(action) {
+      case 'departments':
+        if (typeof showDepartments === 'function') showDepartments();
+        break;
+      case 'suppliers':
+        if (typeof showSuppliers === 'function') showSuppliers();
+        break;
+      case 'locations':
+        if (typeof showLocations === 'function') showLocations();
+        break;
+    }
   }
 }
 
