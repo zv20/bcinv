@@ -7,6 +7,13 @@ function hideAllViews() {
     document.querySelectorAll('.nav-link, .dropdown-item').forEach(l => l.classList.remove('active'));
 }
 
+// Helper to clear performance cache before refreshing data
+function clearCache() {
+    if (window.performanceOptimizer) {
+        window.performanceOptimizer.clearCache();
+    }
+}
+
 function showDashboard() { hideAllViews(); document.getElementById('dashboardView').style.display = 'block'; document.querySelector('a[onclick*="showDashboard"]').classList.add('active'); loadDashboard(); }
 function showProducts() { hideAllViews(); document.getElementById('productsView').style.display = 'block'; document.querySelector('a[onclick*="showProducts"]').classList.add('active'); loadProducts(); }
 function showStock() { hideAllViews(); document.getElementById('stockView').style.display = 'block'; document.querySelector('a[onclick*="showStock"]').classList.add('active'); loadStock(); }
@@ -71,10 +78,9 @@ async function addProduct() {
         const response = await fetch(`${API_URL}/products`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
         if (response.ok) { 
             bootstrap.Modal.getInstance(document.getElementById('addProductModal')).hide();
-            setTimeout(async () => {
-                await loadProducts();
-                alert('Product added!');
-            }, 100);
+            clearCache();
+            await loadProducts();
+            alert('Product added!');
         }
         else { alert('Error: ' + (await response.json()).error); }
     } catch (error) { alert('Failed to add product'); }
@@ -110,10 +116,9 @@ async function updateProduct() {
         const response = await fetch(`${API_URL}/products/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
         if (response.ok) { 
             bootstrap.Modal.getInstance(document.getElementById('editProductModal')).hide();
-            setTimeout(async () => {
-                await loadProducts();
-                alert('Product updated!');
-            }, 100);
+            clearCache();
+            await loadProducts();
+            alert('Product updated!');
         }
         else { alert('Error: ' + (await response.json()).error); }
     } catch (error) { alert('Failed to update product'); }
@@ -123,8 +128,9 @@ async function deleteProduct(id, name) {
     if (!confirm(`Delete "${name}"?`)) return;
     try {
         await fetch(`${API_URL}/products/${id}`, { method: 'DELETE' });
+        clearCache();
         await loadProducts();
-        setTimeout(() => alert('Deleted'), 50);
+        alert('Deleted');
     } catch (error) { console.error('Delete error:', error); }
 }
 
@@ -155,10 +161,9 @@ async function addStock() {
         const response = await fetch(`${API_URL}/stock/add`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
         if (response.ok) { 
             bootstrap.Modal.getInstance(document.getElementById('addStockModal')).hide();
-            setTimeout(async () => {
-                await loadStock();
-                alert('Stock added!');
-            }, 100);
+            clearCache();
+            await loadStock();
+            alert('Stock added!');
         }
         else { alert('Error: ' + (await response.json()).error); }
     } catch (error) { alert('Failed to add stock'); }
@@ -170,8 +175,9 @@ async function adjustStock(batchId, productName, currentQty) {
     const notes = prompt('Reason (optional):');
     try {
         await fetch(`${API_URL}/stock/adjust`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ batch_id: batchId, quantity: parseFloat(newQty), reason: 'manual_audit', notes }) });
+        clearCache();
         await loadStock();
-        setTimeout(() => alert('Adjusted'), 50);
+        alert('Adjusted');
     } catch (error) { console.error('Adjust error:', error); }
 }
 
@@ -182,8 +188,9 @@ async function discardStock(batchId, productName, quantity) {
     if (!qtyToDiscard) return;
     try {
         await fetch(`${API_URL}/stock/discard`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ batch_id: batchId, quantity: parseFloat(qtyToDiscard), reason: {'1': 'expired', '2': 'damaged', '3': 'other'}[reason] || 'other', notes: '' }) });
+        clearCache();
         await loadStock();
-        setTimeout(() => alert('Discarded'), 50);
+        alert('Discarded');
     } catch (error) { console.error('Discard error:', error); }
 }
 
@@ -214,10 +221,9 @@ async function addDepartment() {
         const response = await fetch(`${API_URL}/departments`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
         if (response.ok) { 
             bootstrap.Modal.getInstance(document.getElementById('addDepartmentModal')).hide();
-            setTimeout(async () => {
-                await loadDepartments();
-                alert('Department added!');
-            }, 100);
+            clearCache();
+            await loadDepartments();
+            alert('Department added!');
         }
         else { alert('Error: ' + (await response.json()).error); }
     } catch (error) { alert('Failed to add department'); }
@@ -236,10 +242,9 @@ async function updateDepartment() {
     try {
         await fetch(`${API_URL}/departments/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
         bootstrap.Modal.getInstance(document.getElementById('editDepartmentModal')).hide();
-        setTimeout(async () => {
-            await loadDepartments();
-            alert('Updated!');
-        }, 100);
+        clearCache();
+        await loadDepartments();
+        alert('Updated!');
     } catch (error) { alert('Failed to update'); }
 }
 
@@ -247,8 +252,9 @@ async function deleteDepartment(id, name) {
     if (!confirm(`Delete "${name}"?`)) return;
     try { 
         await fetch(`${API_URL}/departments/${id}`, { method: 'DELETE' });
+        clearCache();
         await loadDepartments();
-        setTimeout(() => alert('Deleted'), 50);
+        alert('Deleted'); 
     }
     catch (error) { console.error('Delete error:', error); }
 }
@@ -269,10 +275,9 @@ async function addSupplier() {
         const response = await fetch(`${API_URL}/suppliers`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
         if (response.ok) { 
             bootstrap.Modal.getInstance(document.getElementById('addSupplierModal')).hide();
-            setTimeout(async () => {
-                await loadSuppliers();
-                alert('Supplier added!');
-            }, 100);
+            clearCache();
+            await loadSuppliers();
+            alert('Supplier added!');
         }
         else { alert('Error: ' + (await response.json()).error); }
     } catch (error) { alert('Failed to add supplier'); }
@@ -295,10 +300,9 @@ async function updateSupplier() {
     try {
         await fetch(`${API_URL}/suppliers/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
         bootstrap.Modal.getInstance(document.getElementById('editSupplierModal')).hide();
-        setTimeout(async () => {
-            await loadSuppliers();
-            alert('Updated!');
-        }, 100);
+        clearCache();
+        await loadSuppliers();
+        alert('Updated!');
     } catch (error) { alert('Failed to update'); }
 }
 
@@ -306,8 +310,9 @@ async function deleteSupplier(id, name) {
     if (!confirm(`Delete "${name}"?`)) return;
     try { 
         await fetch(`${API_URL}/suppliers/${id}`, { method: 'DELETE' });
+        clearCache();
         await loadSuppliers();
-        setTimeout(() => alert('Deleted'), 50);
+        alert('Deleted'); 
     }
     catch (error) { console.error('Delete error:', error); }
 }
@@ -328,10 +333,9 @@ async function addLocation() {
         const response = await fetch(`${API_URL}/locations`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
         if (response.ok) { 
             bootstrap.Modal.getInstance(document.getElementById('addLocationModal')).hide();
-            setTimeout(async () => {
-                await loadLocations();
-                alert('Location added!');
-            }, 100);
+            clearCache();
+            await loadLocations();
+            alert('Location added!');
         }
         else { alert('Error: ' + (await response.json()).error); }
     } catch (error) { alert('Failed to add location'); }
@@ -351,10 +355,9 @@ async function updateLocation() {
     try {
         await fetch(`${API_URL}/locations/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
         bootstrap.Modal.getInstance(document.getElementById('editLocationModal')).hide();
-        setTimeout(async () => {
-            await loadLocations();
-            alert('Updated!');
-        }, 100);
+        clearCache();
+        await loadLocations();
+        alert('Updated!');
     } catch (error) { alert('Failed to update'); }
 }
 
@@ -362,8 +365,9 @@ async function deleteLocation(id, name) {
     if (!confirm(`Delete "${name}"?`)) return;
     try { 
         await fetch(`${API_URL}/locations/${id}`, { method: 'DELETE' });
+        clearCache();
         await loadLocations();
-        setTimeout(() => alert('Deleted'), 50);
+        alert('Deleted'); 
     }
     catch (error) { console.error('Delete error:', error); }
 }
