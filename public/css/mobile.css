@@ -16,6 +16,21 @@
   --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1);
 }
 
+/* Hide desktop navbar on mobile */
+@media (max-width: 767px) {
+  .navbar.fixed-top {
+    display: none !important;
+  }
+  
+  body {
+    padding-top: 0 !important;
+  }
+  
+  .container-fluid {
+    padding-top: 16px;
+  }
+}
+
 /* Base mobile styles */
 body.mobile {
   margin: 0;
@@ -353,7 +368,7 @@ body.mobile {
   color: var(--text-secondary);
 }
 
-/* Responsive */
+/* Responsive - Hide mobile nav on desktop */
 @media (min-width: 768px) {
   .mobile-nav {
     display: none;
