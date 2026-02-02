@@ -235,7 +235,16 @@ app.get('/api/products/:id', async (req, res) => {
 app.get('/api/products/:id/batches', async (req, res) => {
   try {
     const result = await pool.query(`
-      SELECT sb.*, l.name as location_name
+      SELECT 
+        sb.id,
+        sb.product_id,
+        sb.location_id,
+        sb.quantity,
+        sb.expiry_date,
+        sb.batch_number,
+        sb.received_at as received_date,
+        sb.status,
+        l.name as location_name
       FROM stock_batches sb
       LEFT JOIN locations l ON sb.location_id = l.id
       WHERE sb.product_id = $1 AND sb.status = 'active'
@@ -250,7 +259,7 @@ app.get('/api/products/:id/batches', async (req, res) => {
 });
 
 app.post('/api/products/:id/batches', async (req, res) => {
-  const { location_id, quantity, expiry_date, batch_number, notes } = req.body;
+  const { location_id, quantity, expiration_date, batch_number, notes, received_date } = req.body;
   const product_id = req.params.id;
   
   if (!quantity) {
@@ -259,10 +268,18 @@ app.post('/api/products/:id/batches', async (req, res) => {
   
   try {
     const result = await pool.query(
-      `INSERT INTO stock_batches (product_id, location_id, quantity, expiry_date, batch_number, notes)
-       VALUES ($1, $2, $3, $4, $5, $6)
+      `INSERT INTO stock_batches (product_id, location_id, quantity, expiry_date, batch_number, notes, received_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)
        RETURNING *`,
-      [product_id, emptyToNull(location_id), quantity, emptyToNull(expiry_date), emptyToNull(batch_number), emptyToNull(notes)]
+      [
+        product_id, 
+        emptyToNull(location_id), 
+        quantity, 
+        emptyToNull(expiration_date), 
+        emptyToNull(batch_number), 
+        emptyToNull(notes),
+        received_date || new Date().toISOString()
+      ]
     );
     
     await pool.query(
@@ -313,6 +330,82 @@ app.post('/api/products/:id/batches/deduct', async (req, res) => {
     await client.query('ROLLBACK');
     logger.error('Batch deduct error:', error);
     res.status(500).json({ error: 'Failed to deduct from batches' });
+  } finally {
+    client.release();
+  }
+});
+
+// Sync product quantity from batches
+app.post('/api/products/:id/sync-quantity', async (req, res) => {
+  const product_id = req.params.id;
+  
+  try {
+    // This endpoint doesn't actually update a quantity column since we use calculated quantities
+    // But we can use it to trigger a refresh or validation
+    const result = await pool.query(`
+      SELECT COALESCE(SUM(quantity), 0) as total
+      FROM stock_batches
+      WHERE product_id = $1 AND status = 'active'
+    `, [product_id]);
+    
+    res.json({ 
+      message: 'Quantity synced', 
+      total_quantity: parseInt(result.rows[0].total)
+    });
+  } catch (error) {
+    logger.error('Sync quantity error:', error);
+    res.status(500).json({ error: 'Failed to sync quantity' });
+  }
+});
+
+// Discard specific batch
+app.post('/api/products/:id/batches/:batchId/discard', async (req, res) => {
+  const { reason } = req.body;
+  const product_id = req.params.id;
+  const batch_id = req.params.batchId;
+  
+  if (!reason) {
+    return res.status(400).json({ error: 'Reason is required' });
+  }
+  
+  const client = await pool.connect();
+  
+  try {
+    await client.query('BEGIN');
+    
+    // Get batch info
+    const batchResult = await client.query(
+      'SELECT * FROM stock_batches WHERE id = $1 AND product_id = $2',
+      [batch_id, product_id]
+    );
+    
+    if (batchResult.rows.length === 0) {
+      throw new Error('Batch not found');
+    }
+    
+    const batch = batchResult.rows[0];
+    
+    // Mark batch as discarded
+    await client.query(
+      "UPDATE stock_batches SET status = 'discarded', quantity = 0 WHERE id = $1",
+      [batch_id]
+    );
+    
+    // Log the discard
+    await client.query(
+      `INSERT INTO audit_log (product_id, batch_id, action, quantity_change, reason, notes)
+       VALUES ($1, $2, 'discard_batch', $3, $4, 'Batch discarded')`,
+      [product_id, batch_id, -batch.quantity, reason]
+    );
+    
+    await client.query('COMMIT');
+    
+    logger.info(`Batch ${batch_id} discarded: ${batch.quantity} units, reason: ${reason}`);
+    res.json({ message: 'Batch discarded successfully', quantity_discarded: batch.quantity });
+  } catch (error) {
+    await client.query('ROLLBACK');
+    logger.error('Batch discard error:', error);
+    res.status(500).json({ error: 'Failed to discard batch' });
   } finally {
     client.release();
   }
