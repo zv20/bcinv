@@ -9,6 +9,7 @@ class PerformanceOptimizer {
         this.cache = new Map();
         this.pendingRequests = new Map();
         this.debounceTimers = new Map();
+        this.originalFetch = window.fetch; // Store original fetch
     }
 
     /**
@@ -70,8 +71,8 @@ class PerformanceOptimizer {
             }
         }
 
-        // Make new request
-        const promise = fetch(url, options)
+        // Make new request using ORIGINAL fetch (not overridden one)
+        const promise = this.originalFetch(url, options)
             .then(response => response.json())
             .then(data => {
                 this.cache.set(key, { data, timestamp: Date.now() });
@@ -95,15 +96,12 @@ class PerformanceOptimizer {
         if (typeof window !== 'undefined' && !window.__fetchDeduplicationSetup) {
             window.__fetchDeduplicationSetup = true;
             
-            // Store original fetch
-            const originalFetch = window.fetch;
-            
             // Only deduplicate GET requests to our API
             window.fetch = (url, options = {}) => {
                 if (typeof url === 'string' && url.startsWith('/api/') && (!options.method || options.method === 'GET')) {
                     return this.fetchWithDeduplication(url, options);
                 }
-                return originalFetch(url, options);
+                return this.originalFetch(url, options);
             };
         }
     }
