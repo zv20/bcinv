@@ -9,7 +9,8 @@ class PerformanceOptimizer {
         this.cache = new Map();
         this.pendingRequests = new Map();
         this.debounceTimers = new Map();
-        this.originalFetch = window.fetch; // Store original fetch
+        // Store original fetch and bind it to window to preserve context
+        this.originalFetch = window.fetch.bind(window);
     }
 
     /**
@@ -71,7 +72,7 @@ class PerformanceOptimizer {
             }
         }
 
-        // Make new request using ORIGINAL fetch (not overridden one)
+        // Make new request using ORIGINAL fetch (bound to window)
         const promise = this.originalFetch(url, options)
             .then(response => response.json())
             .then(data => {
