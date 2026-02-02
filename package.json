@@ -1,7 +1,7 @@
 {
   "name": "bcinv",
-  "version": "0.1.0",
-  "description": "Simple grocery inventory management with PostgreSQL",
+  "version": "1.1.0",
+  "description": "BC Inventory Management - Device-aware inventory tracking with barcode scanning",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
@@ -9,7 +9,7 @@
     "migrate": "node migrations/migrate.js",
     "worker": "node worker.js"
   },
-  "keywords": ["inventory", "grocery", "postgresql", "expiry-tracking"],
+  "keywords": ["inventory", "grocery", "postgresql", "expiry-tracking", "barcode-scanner", "batch-tracking"],
   "author": "zv20",
   "license": "MIT",
   "dependencies": {
@@ -23,7 +23,7 @@
     "winston": "^3.11.0",
     "cookie-parser": "^1.4.6",
     "html5-qrcode": "^2.3.8",
-    "json2csv": "^6.0.0",
+    "json2csv": "^5.0.7",
     "pdfkit": "^0.14.0",
     "exceljs": "^4.4.0"
   },
