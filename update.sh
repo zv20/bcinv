@@ -42,7 +42,13 @@ echo -e "  Message: ${MAGENTA}${CURRENT_MESSAGE}${NC}"
 
 # Check service status
 API_STATUS=$(systemctl is-active bcinv-api 2>/dev/null || echo "inactive")
-WORKER_STATUS=$(systemctl is-active bcinv-worker 2>/dev/null || echo "inactive")
+WORKER_EXISTS=$(systemctl list-unit-files | grep -q "bcinv-worker.service" && echo "yes" || echo "no")
+if [ "$WORKER_EXISTS" = "yes" ]; then
+    WORKER_STATUS=$(systemctl is-active bcinv-worker 2>/dev/null || echo "inactive")
+else
+    WORKER_STATUS="not installed"
+fi
+
 echo -e "  API Service: ${MAGENTA}${API_STATUS}${NC}"
 echo -e "  Worker Service: ${MAGENTA}${WORKER_STATUS}${NC}"
 echo
@@ -95,7 +101,12 @@ else
 fi
 
 echo -e "${YELLOW}🛑 Stopping services...${NC}"
-systemctl stop bcinv-api bcinv-worker
+# Stop API service (required)
+systemctl stop bcinv-api
+# Stop worker service if it exists
+if [ "$WORKER_EXISTS" = "yes" ]; then
+    systemctl stop bcinv-worker 2>/dev/null || echo -e "${YELLOW}  Worker service already stopped${NC}"
+fi
 echo -e "${GREEN}✓ Services stopped${NC}"
 
 echo -e "${YELLOW}⬇️  Pulling latest code...${NC}"
@@ -104,7 +115,10 @@ if git pull origin $CURRENT_BRANCH; then
 else
     echo -e "${RED}✖ Failed to pull changes${NC}"
     echo -e "${YELLOW}Restarting services...${NC}"
-    systemctl start bcinv-api bcinv-worker
+    systemctl start bcinv-api
+    if [ "$WORKER_EXISTS" = "yes" ]; then
+        systemctl start bcinv-worker 2>/dev/null || true
+    fi
     exit 1
 fi
 
@@ -140,7 +154,12 @@ else
 fi
 
 echo -e "${YELLOW}🔄 Starting services...${NC}"
-systemctl start bcinv-api bcinv-worker
+# Start API service (required)
+systemctl start bcinv-api
+# Start worker service if it exists
+if [ "$WORKER_EXISTS" = "yes" ]; then
+    systemctl start bcinv-worker 2>/dev/null || echo -e "${YELLOW}  Worker service not started (optional)${NC}"
+fi
 echo -e "${GREEN}✓ Services started${NC}"
 
 echo -e "${YELLOW}⏳ Waiting for services to be ready...${NC}"
@@ -148,14 +167,28 @@ sleep 5
 
 # Verify services
 API_STATUS=$(systemctl is-active bcinv-api 2>/dev/null)
-WORKER_STATUS=$(systemctl is-active bcinv-worker 2>/dev/null)
-
-if [ "$API_STATUS" = "active" ] && [ "$WORKER_STATUS" = "active" ]; then
-    echo -e "${GREEN}✓ Services started successfully${NC}"
+if [ "$WORKER_EXISTS" = "yes" ]; then
+    WORKER_STATUS=$(systemctl is-active bcinv-worker 2>/dev/null)
 else
-    echo -e "${RED}✖ Service startup issues detected${NC}"
+    WORKER_STATUS="not installed"
+fi
+
+# Check if API is running (required)
+if [ "$API_STATUS" = "active" ]; then
+    echo -e "${GREEN}✓ API service started successfully${NC}"
+    # Worker is optional, just inform
+    if [ "$WORKER_EXISTS" = "yes" ]; then
+        if [ "$WORKER_STATUS" = "active" ]; then
+            echo -e "${GREEN}✓ Worker service started successfully${NC}"
+        else
+            echo -e "${YELLOW}⚠️  Worker service not active (this is optional)${NC}"
+        fi
+    else
+        echo -e "${BLUE}ℹ️  Worker service not installed (See Issue #2)${NC}"
+    fi
+else
+    echo -e "${RED}✖ API service startup failed${NC}"
     echo -e "${YELLOW}API Status: $API_STATUS${NC}"
-    echo -e "${YELLOW}Worker Status: $WORKER_STATUS${NC}"
     echo -e "${YELLOW}Check logs: journalctl -u bcinv-api -n 50${NC}"
     exit 1
 fi
@@ -175,16 +208,33 @@ echo -e "${BLUE}📊 New Status${NC}"
 echo -e "  Branch: ${MAGENTA}${CURRENT_BRANCH}${NC}"
 echo -e "  Commit: ${MAGENTA}${NEW_COMMIT}${NC}"
 echo -e "  Message: ${MAGENTA}${NEW_MESSAGE}${NC}"
-echo -e "  API Service: ${GREEN}${API_STATUS}${NC}"
-echo -e "  Worker Service: ${GREEN}${WORKER_STATUS}${NC}"
+if [ "$API_STATUS" = "active" ]; then
+    echo -e "  API Service: ${GREEN}${API_STATUS}${NC}"
+else
+    echo -e "  API Service: ${YELLOW}${API_STATUS}${NC}"
+fi
+if [ "$WORKER_EXISTS" = "yes" ]; then
+    if [ "$WORKER_STATUS" = "active" ]; then
+        echo -e "  Worker Service: ${GREEN}${WORKER_STATUS}${NC}"
+    else
+        echo -e "  Worker Service: ${YELLOW}${WORKER_STATUS}${NC}"
+    fi
+else
+    echo -e "  Worker Service: ${BLUE}${WORKER_STATUS}${NC}"
+fi
 echo
 echo -e "${GREEN}💡 Access your application:${NC}"
 echo -e "  ${CYAN}http://${IP}:3000${NC}"
 echo
 echo -e "${BLUE}💡 Useful commands:${NC}"
 echo -e "  View logs: ${CYAN}journalctl -u bcinv-api -f${NC}"
-echo -e "  Restart: ${CYAN}systemctl restart bcinv-api bcinv-worker${NC}"
-echo -e "  Status: ${CYAN}systemctl status bcinv-api bcinv-worker${NC}"
+if [ "$WORKER_EXISTS" = "yes" ]; then
+    echo -e "  Restart: ${CYAN}systemctl restart bcinv-api bcinv-worker${NC}"
+    echo -e "  Status: ${CYAN}systemctl status bcinv-api bcinv-worker${NC}"
+else
+    echo -e "  Restart: ${CYAN}systemctl restart bcinv-api${NC}"
+    echo -e "  Status: ${CYAN}systemctl status bcinv-api${NC}"
+fi
 echo
 echo -e "${CYAN}═══════════════════════════════════════════════════════════${NC}"
 echo
