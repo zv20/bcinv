@@ -70,9 +70,11 @@ async function addProduct() {
     try {
         const response = await fetch(`${API_URL}/products`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
         if (response.ok) { 
-            bootstrap.Modal.getInstance(document.getElementById('addProductModal')).hide(); 
-            await loadProducts(); 
-            alert('Product added!'); 
+            bootstrap.Modal.getInstance(document.getElementById('addProductModal')).hide();
+            setTimeout(async () => {
+                await loadProducts();
+                alert('Product added!');
+            }, 100);
         }
         else { alert('Error: ' + (await response.json()).error); }
     } catch (error) { alert('Failed to add product'); }
@@ -107,9 +109,11 @@ async function updateProduct() {
     try {
         const response = await fetch(`${API_URL}/products/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
         if (response.ok) { 
-            bootstrap.Modal.getInstance(document.getElementById('editProductModal')).hide(); 
-            await loadProducts(); 
-            alert('Product updated!'); 
+            bootstrap.Modal.getInstance(document.getElementById('editProductModal')).hide();
+            setTimeout(async () => {
+                await loadProducts();
+                alert('Product updated!');
+            }, 100);
         }
         else { alert('Error: ' + (await response.json()).error); }
     } catch (error) { alert('Failed to update product'); }
@@ -119,8 +123,8 @@ async function deleteProduct(id, name) {
     if (!confirm(`Delete "${name}"?`)) return;
     try {
         await fetch(`${API_URL}/products/${id}`, { method: 'DELETE' });
-        await loadProducts(); 
-        alert('Deleted');
+        await loadProducts();
+        setTimeout(() => alert('Deleted'), 50);
     } catch (error) { console.error('Delete error:', error); }
 }
 
@@ -150,9 +154,11 @@ async function addStock() {
     try {
         const response = await fetch(`${API_URL}/stock/add`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
         if (response.ok) { 
-            bootstrap.Modal.getInstance(document.getElementById('addStockModal')).hide(); 
-            await loadStock(); 
-            alert('Stock added!'); 
+            bootstrap.Modal.getInstance(document.getElementById('addStockModal')).hide();
+            setTimeout(async () => {
+                await loadStock();
+                alert('Stock added!');
+            }, 100);
         }
         else { alert('Error: ' + (await response.json()).error); }
     } catch (error) { alert('Failed to add stock'); }
@@ -164,8 +170,8 @@ async function adjustStock(batchId, productName, currentQty) {
     const notes = prompt('Reason (optional):');
     try {
         await fetch(`${API_URL}/stock/adjust`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ batch_id: batchId, quantity: parseFloat(newQty), reason: 'manual_audit', notes }) });
-        await loadStock(); 
-        alert('Adjusted');
+        await loadStock();
+        setTimeout(() => alert('Adjusted'), 50);
     } catch (error) { console.error('Adjust error:', error); }
 }
 
@@ -176,8 +182,8 @@ async function discardStock(batchId, productName, quantity) {
     if (!qtyToDiscard) return;
     try {
         await fetch(`${API_URL}/stock/discard`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ batch_id: batchId, quantity: parseFloat(qtyToDiscard), reason: {'1': 'expired', '2': 'damaged', '3': 'other'}[reason] || 'other', notes: '' }) });
-        await loadStock(); 
-        alert('Discarded');
+        await loadStock();
+        setTimeout(() => alert('Discarded'), 50);
     } catch (error) { console.error('Discard error:', error); }
 }
 
@@ -207,9 +213,11 @@ async function addDepartment() {
     try {
         const response = await fetch(`${API_URL}/departments`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
         if (response.ok) { 
-            bootstrap.Modal.getInstance(document.getElementById('addDepartmentModal')).hide(); 
-            await loadDepartments(); 
-            alert('Department added!'); 
+            bootstrap.Modal.getInstance(document.getElementById('addDepartmentModal')).hide();
+            setTimeout(async () => {
+                await loadDepartments();
+                alert('Department added!');
+            }, 100);
         }
         else { alert('Error: ' + (await response.json()).error); }
     } catch (error) { alert('Failed to add department'); }
@@ -227,18 +235,20 @@ async function updateDepartment() {
     const data = { name: document.getElementById('editDepartmentName').value, description: document.getElementById('editDepartmentDescription').value };
     try {
         await fetch(`${API_URL}/departments/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
-        bootstrap.Modal.getInstance(document.getElementById('editDepartmentModal')).hide(); 
-        await loadDepartments(); 
-        alert('Updated!');
+        bootstrap.Modal.getInstance(document.getElementById('editDepartmentModal')).hide();
+        setTimeout(async () => {
+            await loadDepartments();
+            alert('Updated!');
+        }, 100);
     } catch (error) { alert('Failed to update'); }
 }
 
 async function deleteDepartment(id, name) {
     if (!confirm(`Delete "${name}"?`)) return;
     try { 
-        await fetch(`${API_URL}/departments/${id}`, { method: 'DELETE' }); 
-        await loadDepartments(); 
-        alert('Deleted'); 
+        await fetch(`${API_URL}/departments/${id}`, { method: 'DELETE' });
+        await loadDepartments();
+        setTimeout(() => alert('Deleted'), 50);
     }
     catch (error) { console.error('Delete error:', error); }
 }
@@ -258,9 +268,11 @@ async function addSupplier() {
     try {
         const response = await fetch(`${API_URL}/suppliers`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
         if (response.ok) { 
-            bootstrap.Modal.getInstance(document.getElementById('addSupplierModal')).hide(); 
-            await loadSuppliers(); 
-            alert('Supplier added!'); 
+            bootstrap.Modal.getInstance(document.getElementById('addSupplierModal')).hide();
+            setTimeout(async () => {
+                await loadSuppliers();
+                alert('Supplier added!');
+            }, 100);
         }
         else { alert('Error: ' + (await response.json()).error); }
     } catch (error) { alert('Failed to add supplier'); }
@@ -282,18 +294,20 @@ async function updateSupplier() {
     const data = { name: document.getElementById('editSupplierName').value, contact_name: document.getElementById('editSupplierContact').value, phone: document.getElementById('editSupplierPhone').value, email: document.getElementById('editSupplierEmail').value, address: document.getElementById('editSupplierAddress').value, notes: document.getElementById('editSupplierNotes').value };
     try {
         await fetch(`${API_URL}/suppliers/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
-        bootstrap.Modal.getInstance(document.getElementById('editSupplierModal')).hide(); 
-        await loadSuppliers(); 
-        alert('Updated!');
+        bootstrap.Modal.getInstance(document.getElementById('editSupplierModal')).hide();
+        setTimeout(async () => {
+            await loadSuppliers();
+            alert('Updated!');
+        }, 100);
     } catch (error) { alert('Failed to update'); }
 }
 
 async function deleteSupplier(id, name) {
     if (!confirm(`Delete "${name}"?`)) return;
     try { 
-        await fetch(`${API_URL}/suppliers/${id}`, { method: 'DELETE' }); 
-        await loadSuppliers(); 
-        alert('Deleted'); 
+        await fetch(`${API_URL}/suppliers/${id}`, { method: 'DELETE' });
+        await loadSuppliers();
+        setTimeout(() => alert('Deleted'), 50);
     }
     catch (error) { console.error('Delete error:', error); }
 }
@@ -313,9 +327,11 @@ async function addLocation() {
     try {
         const response = await fetch(`${API_URL}/locations`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
         if (response.ok) { 
-            bootstrap.Modal.getInstance(document.getElementById('addLocationModal')).hide(); 
-            await loadLocations(); 
-            alert('Location added!'); 
+            bootstrap.Modal.getInstance(document.getElementById('addLocationModal')).hide();
+            setTimeout(async () => {
+                await loadLocations();
+                alert('Location added!');
+            }, 100);
         }
         else { alert('Error: ' + (await response.json()).error); }
     } catch (error) { alert('Failed to add location'); }
@@ -334,18 +350,20 @@ async function updateLocation() {
     const data = { name: document.getElementById('editLocationName').value, section: document.getElementById('editLocationSection').value, description: document.getElementById('editLocationDescription').value };
     try {
         await fetch(`${API_URL}/locations/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(data) });
-        bootstrap.Modal.getInstance(document.getElementById('editLocationModal')).hide(); 
-        await loadLocations(); 
-        alert('Updated!');
+        bootstrap.Modal.getInstance(document.getElementById('editLocationModal')).hide();
+        setTimeout(async () => {
+            await loadLocations();
+            alert('Updated!');
+        }, 100);
     } catch (error) { alert('Failed to update'); }
 }
 
 async function deleteLocation(id, name) {
     if (!confirm(`Delete "${name}"?`)) return;
     try { 
-        await fetch(`${API_URL}/locations/${id}`, { method: 'DELETE' }); 
-        await loadLocations(); 
-        alert('Deleted'); 
+        await fetch(`${API_URL}/locations/${id}`, { method: 'DELETE' });
+        await loadLocations();
+        setTimeout(() => alert('Deleted'), 50);
     }
     catch (error) { console.error('Delete error:', error); }
 }
