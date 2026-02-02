@@ -176,9 +176,18 @@ class MobileNav {
     this.currentPage = page;
     this.updateActiveState();
     
-    // Emit custom event for page change
-    const event = new CustomEvent('mobileNavChange', { detail: { page } });
-    document.dispatchEvent(event);
+    // Call the appropriate page function from app.js
+    switch(page) {
+      case 'dashboard':
+        if (typeof showDashboard === 'function') showDashboard();
+        break;
+      case 'inventory':
+        if (typeof showStock === 'function') showStock();
+        break;
+      case 'settings':
+        if (typeof showDepartments === 'function') showDepartments();
+        break;
+    }
   }
 
   updateActiveState() {
