@@ -212,11 +212,26 @@ class BarcodeScanner {
       const response = await fetch(`/api/products?search=${encodeURIComponent(barcode)}`);
       
       if (!response.ok) {
-        throw new Error('Failed to check product');
+        throw new Error(`HTTP error! status: ${response.status}`);
       }
       
-      const products = await response.json();
-      console.log('Products found:', products);
+      const data = await response.json();
+      console.log('API Response:', data);
+      
+      // Handle different response formats
+      let products = [];
+      if (Array.isArray(data)) {
+        products = data;
+      } else if (data.products && Array.isArray(data.products)) {
+        products = data.products;
+      } else if (data.data && Array.isArray(data.data)) {
+        products = data.data;
+      } else {
+        console.error('Unexpected API response format:', data);
+        throw new Error('Invalid API response format');
+      }
+      
+      console.log('Products array:', products);
       
       const existingProduct = products.find(p => p.sku === barcode);
       
@@ -258,7 +273,7 @@ class BarcodeScanner {
       
     } catch (err) {
       console.error('Error in handleAddItem:', err);
-      alert('Error checking product: ' + err.message);
+      alert('Error checking product: ' + err.message + '\n\nPlease try again or add manually.');
     }
   }
 
@@ -269,10 +284,25 @@ class BarcodeScanner {
       const response = await fetch(`/api/products?search=${encodeURIComponent(barcode)}`);
       
       if (!response.ok) {
-        throw new Error('Failed to fetch products');
+        throw new Error(`HTTP error! status: ${response.status}`);
       }
       
-      const products = await response.json();
+      const data = await response.json();
+      console.log('API Response:', data);
+      
+      // Handle different response formats
+      let products = [];
+      if (Array.isArray(data)) {
+        products = data;
+      } else if (data.products && Array.isArray(data.products)) {
+        products = data.products;
+      } else if (data.data && Array.isArray(data.data)) {
+        products = data.data;
+      } else {
+        console.error('Unexpected API response format:', data);
+        throw new Error('Invalid API response format');
+      }
+      
       const product = products.find(p => p.sku === barcode);
       
       if (!product) {
@@ -284,10 +314,21 @@ class BarcodeScanner {
       const stockResponse = await fetch(`/api/stock?product_id=${product.id}`);
       
       if (!stockResponse.ok) {
-        throw new Error('Failed to fetch stock');
+        throw new Error(`HTTP error! status: ${stockResponse.status}`);
       }
       
-      const stock = await stockResponse.json();
+      const stockData = await stockResponse.json();
+      console.log('Stock API Response:', stockData);
+      
+      // Handle stock response format
+      let stock = [];
+      if (Array.isArray(stockData)) {
+        stock = stockData;
+      } else if (stockData.stock && Array.isArray(stockData.stock)) {
+        stock = stockData.stock;
+      } else if (stockData.data && Array.isArray(stockData.data)) {
+        stock = stockData.data;
+      }
 
       let message = `Product: ${product.name}\n`;
       message += `Barcode: ${product.sku}\n\n`;
@@ -319,10 +360,21 @@ class BarcodeScanner {
       const response = await fetch(`/api/products?search=${encodeURIComponent(barcode)}`);
       
       if (!response.ok) {
-        throw new Error('Failed to fetch products');
+        throw new Error(`HTTP error! status: ${response.status}`);
       }
       
-      const products = await response.json();
+      const data = await response.json();
+      
+      // Handle different response formats
+      let products = [];
+      if (Array.isArray(data)) {
+        products = data;
+      } else if (data.products && Array.isArray(data.products)) {
+        products = data.products;
+      } else if (data.data && Array.isArray(data.data)) {
+        products = data.data;
+      }
+      
       const product = products.find(p => p.sku === barcode);
       
       if (!product) {
@@ -349,10 +401,21 @@ class BarcodeScanner {
       const response = await fetch(`/api/products?search=${encodeURIComponent(barcode)}`);
       
       if (!response.ok) {
-        throw new Error('Failed to fetch products');
+        throw new Error(`HTTP error! status: ${response.status}`);
       }
       
-      const products = await response.json();
+      const data = await response.json();
+      
+      // Handle different response formats
+      let products = [];
+      if (Array.isArray(data)) {
+        products = data;
+      } else if (data.products && Array.isArray(data.products)) {
+        products = data.products;
+      } else if (data.data && Array.isArray(data.data)) {
+        products = data.data;
+      }
+      
       const product = products.find(p => p.sku === barcode);
       
       if (!product) {
