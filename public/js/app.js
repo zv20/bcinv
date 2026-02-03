@@ -2,6 +2,8 @@ const API_URL = '/api';
 
 // Global stock data for filtering
 let allStockData = [];
+// Store current product being viewed in details
+let currentProduct = null;
 
 document.addEventListener('DOMContentLoaded', () => { showDashboard(); });
 
@@ -50,6 +52,147 @@ function renderStockTable(stock) {
         }).join('');
 }
 
+// Show product details with batches
+async function showProductDetails(productId) {
+    try {
+        // Fetch product details
+        const response = await fetch(`${API_URL}/products/${productId}`);
+        if (!response.ok) {
+            // If specific endpoint doesn't exist, fetch all and find it
+            const allProductsResp = await fetch(`${API_URL}/products?limit=1000`);
+            const allData = await allProductsResp.json();
+            currentProduct = allData.products.find(p => p.id === productId);
+        } else {
+            currentProduct = await response.json();
+        }
+        
+        if (!currentProduct) {
+            alert('Product not found');
+            return;
+        }
+        
+        // Fill product details
+        document.getElementById('detailProductName').textContent = currentProduct.name;
+        document.getElementById('detailProductSku').textContent = currentProduct.sku || 'N/A';
+        document.getElementById('detailProductDepartment').textContent = currentProduct.department_name || 'N/A';
+        document.getElementById('detailProductSupplier').textContent = currentProduct.supplier_name || 'N/A';
+        document.getElementById('detailProductUnit').textContent = currentProduct.unit || 'N/A';
+        document.getElementById('detailProductPrice').textContent = currentProduct.cost_price ? '$' + parseFloat(currentProduct.cost_price).toFixed(2) : 'N/A';
+        
+        // Load batches for this product
+        await loadProductBatches(productId);
+        
+        // Show modal
+        new bootstrap.Modal(document.getElementById('productDetailsModal')).show();
+    } catch (error) {
+        console.error('Error loading product details:', error);
+        alert('Failed to load product details');
+    }
+}
+
+// Load batches for current product
+async function loadProductBatches(productId) {
+    try {
+        const response = await fetch(`${API_URL}/stock?product_id=${productId}`);
+        const stockData = await response.json();
+        
+        // Handle different response formats
+        let batches = [];
+        if (Array.isArray(stockData)) {
+            batches = stockData;
+        } else if (stockData.stock && Array.isArray(stockData.stock)) {
+            batches = stockData.stock;
+        } else if (stockData.data && Array.isArray(stockData.data)) {
+            batches = stockData.data;
+        }
+        
+        renderBatchesTable(batches);
+    } catch (error) {
+        console.error('Error loading batches:', error);
+        document.getElementById('batchesTable').innerHTML = '<tr><td colspan="6" class="text-center text-danger">Failed to load batches</td></tr>';
+    }
+}
+
+// Render batches table
+function renderBatchesTable(batches) {
+    if (batches.length === 0) {
+        document.getElementById('batchesTable').innerHTML = '<tr><td colspan="6" class="text-center text-muted">No stock batches for this product. Click "Add Batch" to add stock.</td></tr>';
+        return;
+    }
+    
+    document.getElementById('batchesTable').innerHTML = batches.map(batch => {
+        const daysLeft = batch.expiry_date ? Math.ceil((new Date(batch.expiry_date) - new Date()) / 86400000) : null;
+        const expiryClass = daysLeft !== null && daysLeft <= 7 ? 'text-danger' : daysLeft !== null && daysLeft <= 14 ? 'text-warning' : '';
+        
+        return `<tr>
+            <td>${batch.location_name || 'No location'}</td>
+            <td>${parseFloat(batch.quantity).toFixed(2)}</td>
+            <td class="${expiryClass}">${batch.expiry_date ? new Date(batch.expiry_date).toLocaleDateString() : 'N/A'}</td>
+            <td class="${expiryClass}">${daysLeft !== null ? daysLeft + ' days' : 'N/A'}</td>
+            <td><small>${batch.notes || '-'}</small></td>
+            <td>
+                <button class="btn btn-sm btn-warning btn-icon" onclick="adjustStock(${batch.id}, '${currentProduct.name.replace(/'/g, "\\'")}', ${batch.quantity})">
+                    <i class="bi bi-pencil"></i>
+                </button>
+                <button class="btn btn-sm btn-danger btn-icon" onclick="discardStock(${batch.id}, '${currentProduct.name.replace(/'/g, "\\'")}', ${batch.quantity})">
+                    <i class="bi bi-trash"></i>
+                </button>
+            </td>
+        </tr>`;
+    }).join('');
+}
+
+// Open add batch modal for current product
+async function showAddBatchModal() {
+    if (!currentProduct) {
+        alert('No product selected');
+        return;
+    }
+    
+    // Load locations
+    const locations = await fetch(`${API_URL}/locations`).then(r => r.json());
+    
+    // Pre-fill product selection
+    document.getElementById('stockProductSelect').innerHTML = `<option value="${currentProduct.id}" selected>${currentProduct.name} (${currentProduct.sku || 'No Barcode'})</option>`;
+    document.getElementById('stockLocationSelect').innerHTML = '<option value="">No location</option>' + locations.map(l => `<option value="${l.id}">${l.name}</option>`).join('');
+    document.getElementById('addStockForm').reset();
+    document.getElementById('stockProductSelect').value = currentProduct.id;
+    
+    // Hide product details modal temporarily
+    bootstrap.Modal.getInstance(document.getElementById('productDetailsModal')).hide();
+    
+    // Show add stock modal
+    const addStockModal = new bootstrap.Modal(document.getElementById('addStockModal'));
+    addStockModal.show();
+    
+    // When add stock modal closes, reopen product details
+    document.getElementById('addStockModal').addEventListener('hidden.bs.modal', function handler() {
+        if (currentProduct) {
+            setTimeout(() => {
+                new bootstrap.Modal(document.getElementById('productDetailsModal')).show();
+                loadProductBatches(currentProduct.id);
+            }, 300);
+        }
+        document.getElementById('addStockModal').removeEventListener('hidden.bs.modal', handler);
+    }, { once: true });
+}
+
+// Edit product info from details view
+function editProductFromDetails() {
+    if (!currentProduct) {
+        alert('No product selected');
+        return;
+    }
+    
+    // Hide product details modal
+    bootstrap.Modal.getInstance(document.getElementById('productDetailsModal')).hide();
+    
+    // Small delay then open edit modal
+    setTimeout(() => {
+        editProduct(currentProduct);
+    }, 300);
+}
+
 async function loadDashboard() {
     try {
         const [statsResp, expiringResp, auditResp] = await Promise.all([
@@ -77,7 +220,7 @@ async function loadProducts() {
         const response = await fetch(`${API_URL}/products?limit=100`);
         const data = await response.json();
         document.getElementById('productsTable').innerHTML = data.products.length === 0 ? '<tr><td colspan="7" class="text-center">No products found</td></tr>' :
-            data.products.map(p => `<tr><td>${p.name}</td><td>${p.sku || '-'}</td><td>${p.department_name || '-'}</td><td>${p.supplier_name || '-'}</td><td>${p.unit || '-'}</td><td>$${parseFloat(p.cost_price || 0).toFixed(2)}</td><td><button class="btn btn-sm btn-primary btn-icon" onclick='editProduct(${JSON.stringify(p).replace(/'/g, "&apos;")})'><i class="bi bi-pencil"></i></button> <button class="btn btn-sm btn-danger btn-icon" onclick="deleteProduct(${p.id}, '${p.name.replace(/'/g, "\\'")}')" ><i class="bi bi-trash"></i></button></td></tr>`).join('');
+            data.products.map(p => `<tr><td>${p.name}</td><td>${p.sku || '-'}</td><td>${p.department_name || '-'}</td><td>${p.supplier_name || '-'}</td><td>${p.unit || '-'}</td><td>$${parseFloat(p.cost_price || 0).toFixed(2)}</td><td><button class="btn btn-sm btn-info btn-icon" onclick="showProductDetails(${p.id})" title="View Details"><i class="bi bi-eye"></i></button> <button class="btn btn-sm btn-primary btn-icon" onclick='editProduct(${JSON.stringify(p).replace(/'/g, "&apos;")})'><i class="bi bi-pencil"></i></button> <button class="btn btn-sm btn-danger btn-icon" onclick="deleteProduct(${p.id}, '${p.name.replace(/'/g, "\\'")}')" ><i class="bi bi-trash"></i></button></td></tr>`).join('');
     } catch (error) { console.error('Products error:', error); }
 }
 
@@ -87,7 +230,7 @@ async function searchProducts() {
         const response = await fetch(`${API_URL}/products?search=${encodeURIComponent(search)}&limit=100`);
         const data = await response.json();
         document.getElementById('productsTable').innerHTML = data.products.length === 0 ? '<tr><td colspan="7" class="text-center">No products found</td></tr>' :
-            data.products.map(p => `<tr><td>${p.name}</td><td>${p.sku || '-'}</td><td>${p.department_name || '-'}</td><td>${p.supplier_name || '-'}</td><td>${p.unit || '-'}</td><td>$${parseFloat(p.cost_price || 0).toFixed(2)}</td><td><button class="btn btn-sm btn-primary btn-icon" onclick='editProduct(${JSON.stringify(p).replace(/'/g, "&apos;")})'><i class="bi bi-pencil"></i></button> <button class="btn btn-sm btn-danger btn-icon" onclick="deleteProduct(${p.id}, '${p.name.replace(/'/g, "\\'")}')" ><i class="bi bi-trash"></i></button></td></tr>`).join('');
+            data.products.map(p => `<tr><td>${p.name}</td><td>${p.sku || '-'}</td><td>${p.department_name || '-'}</td><td>${p.supplier_name || '-'}</td><td>${p.unit || '-'}</td><td>$${parseFloat(p.cost_price || 0).toFixed(2)}</td><td><button class="btn btn-sm btn-info btn-icon" onclick="showProductDetails(${p.id})" title="View Details"><i class="bi bi-eye"></i></button> <button class="btn btn-sm btn-primary btn-icon" onclick='editProduct(${JSON.stringify(p).replace(/'/g, "&apos;")})'><i class="bi bi-pencil"></i></button> <button class="btn btn-sm btn-danger btn-icon" onclick="deleteProduct(${p.id}, '${p.name.replace(/'/g, "\\'")}')" ><i class="bi bi-trash"></i></button></td></tr>`).join('');
     } catch (error) { console.error('Search error:', error); }
 }
 
@@ -146,6 +289,10 @@ async function updateProduct() {
             bootstrap.Modal.getInstance(document.getElementById('editProductModal')).hide();
             clearCache();
             await loadProducts();
+            // If we were in product details, reload it
+            if (currentProduct && currentProduct.id == id) {
+                setTimeout(() => showProductDetails(id), 300);
+            }
             alert('Product updated!');
         }
         else { alert('Error: ' + (await response.json()).error); }
@@ -187,6 +334,10 @@ async function addStock() {
             bootstrap.Modal.getInstance(document.getElementById('addStockModal')).hide();
             clearCache();
             await loadStock();
+            // If we were viewing product details, reload batches
+            if (currentProduct && data.product_id == currentProduct.id) {
+                await loadProductBatches(currentProduct.id);
+            }
             alert('Stock added!');
         }
         else { alert('Error: ' + (await response.json()).error); }
@@ -201,6 +352,10 @@ async function adjustStock(batchId, productName, currentQty) {
         await fetch(`${API_URL}/stock/adjust`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ batch_id: batchId, quantity: parseFloat(newQty), reason: 'manual_audit', notes }) });
         clearCache();
         await loadStock();
+        // If we were viewing product details, reload batches
+        if (currentProduct) {
+            await loadProductBatches(currentProduct.id);
+        }
         alert('Adjusted');
     } catch (error) { console.error('Adjust error:', error); }
 }
@@ -214,6 +369,10 @@ async function discardStock(batchId, productName, quantity) {
         await fetch(`${API_URL}/stock/discard`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ batch_id: batchId, quantity: parseFloat(qtyToDiscard), reason: {'1': 'expired', '2': 'damaged', '3': 'other'}[reason] || 'other', notes: '' }) });
         clearCache();
         await loadStock();
+        // If we were viewing product details, reload batches
+        if (currentProduct) {
+            await loadProductBatches(currentProduct.id);
+        }
         alert('Discarded');
     } catch (error) { console.error('Discard error:', error); }
 }
