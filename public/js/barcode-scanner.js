@@ -93,6 +93,8 @@ class BarcodeScanner {
     this.currentAction = action;
     this.scannerElement.classList.add('active');
     
+    console.log('Opening scanner for action:', action);
+    
     // Update action label
     const actionLabel = document.querySelector('.barcode-scanner-action-label');
     const actionNames = {
@@ -122,6 +124,7 @@ class BarcodeScanner {
       // Import html5-qrcode dynamically
       if (typeof Html5Qrcode === 'undefined') {
         console.error('html5-qrcode library not loaded');
+        alert('Scanner library not loaded. Please refresh the page.');
         return;
       }
 
@@ -137,6 +140,7 @@ class BarcodeScanner {
         { facingMode: 'environment' },
         config,
         (decodedText) => {
+          console.log('Barcode detected:', decodedText);
           this.handleScanResult(decodedText);
         },
         (errorMessage) => {
@@ -145,6 +149,7 @@ class BarcodeScanner {
       );
 
       this.isScanning = true;
+      console.log('Camera started successfully');
     } catch (err) {
       console.error('Error starting camera:', err);
       alert('Unable to access camera. Please check permissions or use manual entry.');
@@ -165,75 +170,123 @@ class BarcodeScanner {
     this.scanner = null;
     this.currentAction = null;
     this.scannerElement.classList.remove('active');
+    console.log('Scanner closed');
   }
 
   async handleScanResult(barcode) {
-    // Stop scanner
+    console.log('Processing barcode:', barcode, 'for action:', this.currentAction);
+    
+    // Store action before closing
+    const action = this.currentAction;
+    
+    // Stop scanner first
     await this.closeScanner();
 
-    // Process based on action
-    switch(this.currentAction) {
-      case 'add-item':
-        this.handleAddItem(barcode);
-        break;
-      case 'check-stock':
-        this.handleCheckStock(barcode);
-        break;
-      case 'discard-item':
-        this.handleDiscardItem(barcode);
-        break;
-      case 'adjust-stock':
-        this.handleAdjustStock(barcode);
-        break;
-    }
+    // Small delay to ensure scanner is fully closed
+    setTimeout(() => {
+      // Process based on action
+      switch(action) {
+        case 'add-item':
+          this.handleAddItem(barcode);
+          break;
+        case 'check-stock':
+          this.handleCheckStock(barcode);
+          break;
+        case 'discard-item':
+          this.handleDiscardItem(barcode);
+          break;
+        case 'adjust-stock':
+          this.handleAdjustStock(barcode);
+          break;
+        default:
+          console.error('Unknown action:', action);
+      }
+    }, 300);
   }
 
   async handleAddItem(barcode) {
-    // Check if product exists
+    console.log('handleAddItem called with barcode:', barcode);
+    
     try {
+      // Check if product exists
       const response = await fetch(`/api/products?search=${encodeURIComponent(barcode)}`);
+      
+      if (!response.ok) {
+        throw new Error('Failed to check product');
+      }
+      
       const products = await response.json();
+      console.log('Products found:', products);
       
       const existingProduct = products.find(p => p.sku === barcode);
       
       if (existingProduct) {
-        alert(`Product "${existingProduct.name}" already exists!`);
+        alert(`Product "${existingProduct.name}" already exists!\n\nBarcode: ${barcode}`);
         return;
       }
 
-      // Open add product modal with barcode pre-filled
-      if (typeof showAddProductModal === 'function') {
-        showAddProductModal();
-        setTimeout(() => {
-          const barcodeInput = document.getElementById('addProductSku');
-          if (barcodeInput) {
-            barcodeInput.value = barcode;
-            // Focus on product name field
-            const nameInput = document.getElementById('addProductName');
-            if (nameInput) nameInput.focus();
-          }
-        }, 100);
+      // Product doesn't exist, open add modal
+      console.log('Opening add product modal...');
+      
+      // Check if function exists
+      if (typeof showAddProductModal !== 'function') {
+        console.error('showAddProductModal function not found');
+        alert('Error: Cannot open add product form. Please refresh the page.');
+        return;
       }
+      
+      // Open modal
+      showAddProductModal();
+      
+      // Wait a bit for modal to render, then fill in barcode
+      setTimeout(() => {
+        const barcodeInput = document.getElementById('addProductSku');
+        if (barcodeInput) {
+          barcodeInput.value = barcode;
+          console.log('Barcode filled in:', barcode);
+          
+          // Focus on product name field
+          const nameInput = document.getElementById('addProductName');
+          if (nameInput) {
+            nameInput.focus();
+            console.log('Focused on name input');
+          }
+        } else {
+          console.error('Could not find barcode input field');
+        }
+      }, 500);
+      
     } catch (err) {
-      console.error('Error checking product:', err);
-      alert('Error checking product. Please try again.');
+      console.error('Error in handleAddItem:', err);
+      alert('Error checking product: ' + err.message);
     }
   }
 
   async handleCheckStock(barcode) {
+    console.log('handleCheckStock called with barcode:', barcode);
+    
     try {
       const response = await fetch(`/api/products?search=${encodeURIComponent(barcode)}`);
-      const products = await response.json();
       
+      if (!response.ok) {
+        throw new Error('Failed to fetch products');
+      }
+      
+      const products = await response.json();
       const product = products.find(p => p.sku === barcode);
       
       if (!product) {
-        alert('Product not found!');
+        alert('Product not found!\n\nBarcode: ' + barcode);
         return;
       }
 
       // Get stock for this product
       const stockResponse = await fetch(`/api/stock?product_id=${product.id}`);
+      
+      if (!stockResponse.ok) {
+        throw new Error('Failed to fetch stock');
+      }
+      
       const stock = await stockResponse.json();
 
       let message = `Product: ${product.name}\n`;
@@ -252,59 +305,70 @@ class BarcodeScanner {
       }
 
       alert(message);
+      console.log('Stock check complete');
     } catch (err) {
-      console.error('Error checking stock:', err);
-      alert('Error checking stock. Please try again.');
+      console.error('Error in handleCheckStock:', err);
+      alert('Error checking stock: ' + err.message);
     }
   }
 
   async handleDiscardItem(barcode) {
+    console.log('handleDiscardItem called with barcode:', barcode);
+    
     try {
       const response = await fetch(`/api/products?search=${encodeURIComponent(barcode)}`);
-      const products = await response.json();
       
+      if (!response.ok) {
+        throw new Error('Failed to fetch products');
+      }
+      
+      const products = await response.json();
       const product = products.find(p => p.sku === barcode);
       
       if (!product) {
-        alert('Product not found!');
+        alert('Product not found!\n\nBarcode: ' + barcode);
         return;
       }
 
       // For now, show stock and let user manually discard
-      // TODO: Could enhance this with a mobile-optimized discard modal
       alert(`Product found: ${product.name}\n\nPlease use the Stock page to discard items.`);
       
       if (typeof showStock === 'function') {
         showStock();
       }
     } catch (err) {
-      console.error('Error:', err);
-      alert('Error processing request. Please try again.');
+      console.error('Error in handleDiscardItem:', err);
+      alert('Error: ' + err.message);
     }
   }
 
   async handleAdjustStock(barcode) {
+    console.log('handleAdjustStock called with barcode:', barcode);
+    
     try {
       const response = await fetch(`/api/products?search=${encodeURIComponent(barcode)}`);
-      const products = await response.json();
       
+      if (!response.ok) {
+        throw new Error('Failed to fetch products');
+      }
+      
+      const products = await response.json();
       const product = products.find(p => p.sku === barcode);
       
       if (!product) {
-        alert('Product not found!');
+        alert('Product not found!\n\nBarcode: ' + barcode);
         return;
       }
 
       // For now, navigate to stock page
-      // TODO: Could enhance this with a mobile-optimized adjust modal
       alert(`Product found: ${product.name}\n\nPlease use the Stock page to adjust quantities.`);
       
       if (typeof showStock === 'function') {
         showStock();
       }
     } catch (err) {
-      console.error('Error:', err);
-      alert('Error processing request. Please try again.');
+      console.error('Error in handleAdjustStock:', err);
+      alert('Error: ' + err.message);
     }
   }
 }
@@ -312,8 +376,10 @@ class BarcodeScanner {
 // Initialize scanner when DOM is ready
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', () => {
+    console.log('Initializing barcode scanner...');
     window.barcodeScanner = new BarcodeScanner();
   });
 } else {
+  console.log('Initializing barcode scanner...');
   window.barcodeScanner = new BarcodeScanner();
 }
