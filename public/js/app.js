@@ -1,5 +1,8 @@
 const API_URL = '/api';
 
+// Global stock data for filtering
+let allStockData = [];
+
 document.addEventListener('DOMContentLoaded', () => { showDashboard(); });
 
 function hideAllViews() {
@@ -21,6 +24,31 @@ function showExpiring() { hideAllViews(); document.getElementById('expiringView'
 function showDepartments() { hideAllViews(); document.getElementById('departmentsView').style.display = 'block'; loadDepartments(); }
 function showSuppliers() { hideAllViews(); document.getElementById('suppliersView').style.display = 'block'; loadSuppliers(); }
 function showLocations() { hideAllViews(); document.getElementById('locationsView').style.display = 'block'; loadLocations(); }
+
+// Filter stock by product name (called from barcode scanner)
+function filterStockByProduct(productName) {
+    if (!allStockData || allStockData.length === 0) {
+        console.log('No stock data available for filtering');
+        return;
+    }
+    
+    const filtered = allStockData.filter(s => 
+        s.product_name.toLowerCase().includes(productName.toLowerCase())
+    );
+    
+    console.log(`Filtered ${filtered.length} items matching "${productName}"`);
+    renderStockTable(filtered);
+}
+
+// Render stock table (extracted from loadStock)
+function renderStockTable(stock) {
+    document.getElementById('stockTable').innerHTML = stock.length === 0 ? '<tr><td colspan="7" class="text-center">No stock</td></tr>' :
+        stock.map(s => {
+            const daysLeft = s.expiry_date ? Math.ceil((new Date(s.expiry_date) - new Date()) / 86400000) : null;
+            const cls = daysLeft !== null && daysLeft <= 7 ? 'text-danger' : daysLeft !== null && daysLeft <= 14 ? 'text-warning' : '';
+            return `<tr><td>${s.product_name}</td><td>${s.sku || '-'}</td><td>${s.location_name || '-'}</td><td>${parseFloat(s.quantity).toFixed(2)} ${s.unit}</td><td class="${cls}">${s.expiry_date ? new Date(s.expiry_date).toLocaleDateString() : '-'}</td><td class="${cls}">${daysLeft !== null ? daysLeft + ' days' : '-'}</td><td><button class="btn btn-sm btn-warning btn-icon" onclick="adjustStock(${s.id}, '${s.product_name.replace(/'/g, "\\'")}', ${s.quantity})"><i class="bi bi-pencil"></i></button> <button class="btn btn-sm btn-danger btn-icon" onclick="discardStock(${s.id}, '${s.product_name.replace(/'/g, "\\'")}', ${s.quantity})"><i class="bi bi-trash"></i></button></td></tr>`;
+        }).join('');
+}
 
 async function loadDashboard() {
     try {
@@ -137,12 +165,8 @@ async function deleteProduct(id, name) {
 async function loadStock() {
     try {
         const stock = await fetch(`${API_URL}/stock`).then(r => r.json());
-        document.getElementById('stockTable').innerHTML = stock.length === 0 ? '<tr><td colspan="7" class="text-center">No stock</td></tr>' :
-            stock.map(s => {
-                const daysLeft = s.expiry_date ? Math.ceil((new Date(s.expiry_date) - new Date()) / 86400000) : null;
-                const cls = daysLeft !== null && daysLeft <= 7 ? 'text-danger' : daysLeft !== null && daysLeft <= 14 ? 'text-warning' : '';
-                return `<tr><td>${s.product_name}</td><td>${s.sku || '-'}</td><td>${s.location_name || '-'}</td><td>${parseFloat(s.quantity).toFixed(2)} ${s.unit}</td><td class="${cls}">${s.expiry_date ? new Date(s.expiry_date).toLocaleDateString() : '-'}</td><td class="${cls}">${daysLeft !== null ? daysLeft + ' days' : '-'}</td><td><button class="btn btn-sm btn-warning btn-icon" onclick="adjustStock(${s.id}, '${s.product_name.replace(/'/g, "\\'")}', ${s.quantity})"><i class="bi bi-pencil"></i></button> <button class="btn btn-sm btn-danger btn-icon" onclick="discardStock(${s.id}, '${s.product_name.replace(/'/g, "\\'")}', ${s.quantity})"><i class="bi bi-trash"></i></button></td></tr>`;
-            }).join('');
+        allStockData = stock; // Store for filtering
+        renderStockTable(stock);
     } catch (error) { console.error('Stock error:', error); }
 }
 
