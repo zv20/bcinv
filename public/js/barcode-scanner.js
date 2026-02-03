@@ -236,12 +236,12 @@ class BarcodeScanner {
       const existingProduct = products.find(p => p.sku === barcode);
       
       if (existingProduct) {
-        // Product exists - open edit modal
-        console.log('Product found, opening edit modal:', existingProduct);
+        // Product exists - open product details modal showing all batches
+        console.log('Product found, opening product details:', existingProduct);
         
-        // Check if editProduct function exists
-        if (typeof editProduct !== 'function') {
-          console.error('editProduct function not found');
+        // Check if showProductDetails function exists
+        if (typeof showProductDetails !== 'function') {
+          console.error('showProductDetails function not found');
           alert('Error: Cannot open product details. Please refresh the page.');
           return;
         }
@@ -251,9 +251,9 @@ class BarcodeScanner {
           showProducts();
         }
         
-        // Small delay then open edit modal
+        // Small delay then open product details modal
         setTimeout(() => {
-          editProduct(existingProduct);
+          showProductDetails(existingProduct.id);
         }, 300);
         
         return;
