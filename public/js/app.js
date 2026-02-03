@@ -48,7 +48,7 @@ function renderStockTable(stock) {
         stock.map(s => {
             const daysLeft = s.expiry_date ? Math.ceil((new Date(s.expiry_date) - new Date()) / 86400000) : null;
             const cls = daysLeft !== null && daysLeft <= 7 ? 'text-danger' : daysLeft !== null && daysLeft <= 14 ? 'text-warning' : '';
-            return `<tr><td>${s.product_name}</td><td>${s.sku || '-'}</td><td>${s.location_name || '-'}</td><td>${parseFloat(s.quantity).toFixed(2)} ${s.unit}</td><td class="${cls}">${s.expiry_date ? new Date(s.expiry_date).toLocaleDateString() : '-'}</td><td class="${cls}">${daysLeft !== null ? daysLeft + ' days' : '-'}</td><td><button class="btn btn-sm btn-warning btn-icon" onclick="adjustStock(${s.id}, '${s.product_name.replace(/'/g, "\\'")}', ${s.quantity})"><i class="bi bi-pencil"></i></button> <button class="btn btn-sm btn-danger btn-icon" onclick="discardStock(${s.id}, '${s.product_name.replace(/'/g, "\\'")}', ${s.quantity})"><i class="bi bi-trash"></i></button></td></tr>`;
+            return `<tr><td>${s.product_name}</td><td>${s.sku || '-'}</td><td>${s.location_name || '-'}</td><td>${parseFloat(s.quantity).toFixed(2)} ${s.unit}</td><td class="${cls}">${s.expiry_date ? new Date(s.expiry_date).toLocaleDateString() : '-'}</td><td class="${cls}">${daysLeft !== null ? daysLeft + ' days' : '-'}</td><td><button class="btn btn-sm btn-warning btn-icon" onclick="adjustStock(${s.id}, '${s.product_name.replace(/'/g, "\\'")}, ${s.quantity})"><i class="bi bi-pencil"></i></button> <button class="btn btn-sm btn-danger btn-icon" onclick="discardStock(${s.id}, '${s.product_name.replace(/'/g, "\\'")}', ${s.quantity})"><i class="bi bi-trash"></i></button></td></tr>`;
         }).join('');
 }
 
@@ -112,19 +112,20 @@ async function loadProductBatches(productId) {
             return;
         }
         
-        const response = await fetch(`${API_URL}/stock?product_id=${productId}`);
-        const stockData = await response.json();
+        // Use the correct endpoint that filters by product ID
+        const response = await fetch(`${API_URL}/products/${productId}/batches`);
+        const batchesData = await response.json();
         
-        console.log('Stock data response:', stockData);
+        console.log('Batches data response:', batchesData);
         
         // Handle different response formats
         let batches = [];
-        if (Array.isArray(stockData)) {
-            batches = stockData;
-        } else if (stockData.stock && Array.isArray(stockData.stock)) {
-            batches = stockData.stock;
-        } else if (stockData.data && Array.isArray(stockData.data)) {
-            batches = stockData.data;
+        if (Array.isArray(batchesData)) {
+            batches = batchesData;
+        } else if (batchesData.batches && Array.isArray(batchesData.batches)) {
+            batches = batchesData.batches;
+        } else if (batchesData.data && Array.isArray(batchesData.data)) {
+            batches = batchesData.data;
         }
         
         console.log('Parsed batches:', batches);
@@ -148,7 +149,7 @@ function renderBatchesTable(batches, productName) {
     
     // Use passed productName or fall back to currentProduct or batch data
     const safeName = productName || (currentProduct ? currentProduct.name : (batches[0]._productName || 'Product'));
-    const escapedName = safeName.replace(/'/g, "\\'")
+    const escapedName = safeName.replace(/'/g, "\\'");
     
     console.log('Rendering batches with product name:', safeName);
     
@@ -252,7 +253,7 @@ async function loadProducts() {
         const response = await fetch(`${API_URL}/products?limit=100`);
         const data = await response.json();
         document.getElementById('productsTable').innerHTML = data.products.length === 0 ? '<tr><td colspan="7" class="text-center">No products found</td></tr>' :
-            data.products.map(p => `<tr><td>${p.name}</td><td>${p.sku || '-'}</td><td>${p.department_name || '-'}</td><td>${p.supplier_name || '-'}</td><td>${p.unit || '-'}</td><td>$${parseFloat(p.cost_price || 0).toFixed(2)}</td><td><button class="btn btn-sm btn-info btn-icon" onclick="showProductDetails(${p.id})" title="View Details"><i class="bi bi-eye"></i></button> <button class="btn btn-sm btn-primary btn-icon" onclick='editProduct(${JSON.stringify(p).replace(/'/g, "&apos;")})'><i class="bi bi-pencil"></i></button> <button class="btn btn-sm btn-danger btn-icon" onclick="deleteProduct(${p.id}, '${p.name.replace(/'/g, "\\'")}')" ><i class="bi bi-trash"></i></button></td></tr>`).join('');
+            data.products.map(p => `<tr><td>${p.name}</td><td>${p.sku || '-'}</td><td>${p.department_name || '-'}</td><td>${p.supplier_name || '-'}</td><td>${p.unit || '-'}</td><td>$${parseFloat(p.cost_price || 0).toFixed(2)}</td><td><button class="btn btn-sm btn-info btn-icon" onclick="showProductDetails(${p.id})" title="View Details"><i class="bi bi-eye"></i></button> <button class="btn btn-sm btn-primary btn-icon" onclick='editProduct(${JSON.stringify(p).replace(/'/g, "&apos;")})'><i class="bi bi-pencil"></i></button> <button class="btn btn-sm btn-danger btn-icon" onclick="deleteProduct(${p.id}, '${p.name.replace(/'/g, "\\'")}')\" ><i class="bi bi-trash"></i></button></td></tr>`).join('');
     } catch (error) { console.error('Products error:', error); }
 }
 
@@ -262,7 +263,7 @@ async function searchProducts() {
         const response = await fetch(`${API_URL}/products?search=${encodeURIComponent(search)}&limit=100`);
         const data = await response.json();
         document.getElementById('productsTable').innerHTML = data.products.length === 0 ? '<tr><td colspan="7" class="text-center">No products found</td></tr>' :
-            data.products.map(p => `<tr><td>${p.name}</td><td>${p.sku || '-'}</td><td>${p.department_name || '-'}</td><td>${p.supplier_name || '-'}</td><td>${p.unit || '-'}</td><td>$${parseFloat(p.cost_price || 0).toFixed(2)}</td><td><button class="btn btn-sm btn-info btn-icon" onclick="showProductDetails(${p.id})" title="View Details"><i class="bi bi-eye"></i></button> <button class="btn btn-sm btn-primary btn-icon" onclick='editProduct(${JSON.stringify(p).replace(/'/g, "&apos;")})'><i class="bi bi-pencil"></i></button> <button class="btn btn-sm btn-danger btn-icon" onclick="deleteProduct(${p.id}, '${p.name.replace(/'/g, "\\'")}')" ><i class="bi bi-trash"></i></button></td></tr>`).join('');
+            data.products.map(p => `<tr><td>${p.name}</td><td>${p.sku || '-'}</td><td>${p.department_name || '-'}</td><td>${p.supplier_name || '-'}</td><td>${p.unit || '-'}</td><td>$${parseFloat(p.cost_price || 0).toFixed(2)}</td><td><button class="btn btn-sm btn-info btn-icon" onclick="showProductDetails(${p.id})" title="View Details"><i class="bi bi-eye"></i></button> <button class="btn btn-sm btn-primary btn-icon" onclick='editProduct(${JSON.stringify(p).replace(/'/g, "&apos;")})'><i class="bi bi-pencil"></i></button> <button class="btn btn-sm btn-danger btn-icon" onclick="deleteProduct(${p.id}, '${p.name.replace(/'/g, "\\'")}')\" ><i class="bi bi-trash"></i></button></td></tr>`).join('');
     } catch (error) { console.error('Search error:', error); }
 }
 
@@ -424,7 +425,7 @@ async function loadDepartments() {
     try {
         const depts = await fetch(`${API_URL}/departments`).then(r => r.json());
         document.getElementById('departmentsTable').innerHTML = depts.length === 0 ? '<tr><td colspan="4" class="text-center">No departments</td></tr>' :
-            depts.map(d => `<tr><td><strong>${d.name}</strong></td><td>${d.description || '-'}</td><td>${new Date(d.created_at).toLocaleDateString()}</td><td><button class="btn btn-sm btn-primary btn-icon" onclick='editDepartment(${JSON.stringify(d).replace(/'/g, "&apos;")})'><i class="bi bi-pencil"></i></button> <button class="btn btn-sm btn-danger btn-icon" onclick="deleteDepartment(${d.id}, '${d.name.replace(/'/g, "\\'")}')" ><i class="bi bi-trash"></i></button></td></tr>`).join('');
+            depts.map(d => `<tr><td><strong>${d.name}</strong></td><td>${d.description || '-'}</td><td>${new Date(d.created_at).toLocaleDateString()}</td><td><button class="btn btn-sm btn-primary btn-icon" onclick='editDepartment(${JSON.stringify(d).replace(/'/g, "&apos;")})'><i class="bi bi-pencil"></i></button> <button class="btn btn-sm btn-danger btn-icon" onclick="deleteDepartment(${d.id}, '${d.name.replace(/'/g, "\\'")}')\" ><i class="bi bi-trash"></i></button></td></tr>`).join('');
     } catch (error) { console.error('Departments error:', error); }
 }
 
@@ -478,7 +479,7 @@ async function loadSuppliers() {
     try {
         const suppliers = await fetch(`${API_URL}/suppliers`).then(r => r.json());
         document.getElementById('suppliersTable').innerHTML = suppliers.length === 0 ? '<tr><td colspan="5" class="text-center">No suppliers</td></tr>' :
-            suppliers.map(s => `<tr><td><strong>${s.name}</strong></td><td>${s.contact_name || '-'}</td><td>${s.phone || '-'}</td><td>${s.email || '-'}</td><td><button class="btn btn-sm btn-primary btn-icon" onclick='editSupplier(${JSON.stringify(s).replace(/'/g, "&apos;")})'><i class="bi bi-pencil"></i></button> <button class="btn btn-sm btn-danger btn-icon" onclick="deleteSupplier(${s.id}, '${s.name.replace(/'/g, "\\'")}')" ><i class="bi bi-trash"></i></button></td></tr>`).join('');
+            suppliers.map(s => `<tr><td><strong>${s.name}</strong></td><td>${s.contact_name || '-'}</td><td>${s.phone || '-'}</td><td>${s.email || '-'}</td><td><button class="btn btn-sm btn-primary btn-icon" onclick='editSupplier(${JSON.stringify(s).replace(/'/g, "&apos;")})'><i class="bi bi-pencil"></i></button> <button class="btn btn-sm btn-danger btn-icon" onclick="deleteSupplier(${s.id}, '${s.name.replace(/'/g, "\\'")}')\" ><i class="bi bi-trash"></i></button></td></tr>`).join('');
     } catch (error) { console.error('Suppliers error:', error); }
 }
 
@@ -536,7 +537,7 @@ async function loadLocations() {
     try {
         const locs = await fetch(`${API_URL}/locations`).then(r => r.json());
         document.getElementById('locationsTable').innerHTML = locs.length === 0 ? '<tr><td colspan="5" class="text-center">No locations</td></tr>' :
-            locs.map(l => `<tr><td><strong>${l.name}</strong></td><td>${l.section || '-'}</td><td>${l.description || '-'}</td><td>${new Date(l.created_at).toLocaleDateString()}</td><td><button class="btn btn-sm btn-primary btn-icon" onclick='editLocation(${JSON.stringify(l).replace(/'/g, "&apos;")})'><i class="bi bi-pencil"></i></button> <button class="btn btn-sm btn-danger btn-icon" onclick="deleteLocation(${l.id}, '${l.name.replace(/'/g, "\\'")}')" ><i class="bi bi-trash"></i></button></td></tr>`).join('');
+            locs.map(l => `<tr><td><strong>${l.name}</strong></td><td>${l.section || '-'}</td><td>${l.description || '-'}</td><td>${new Date(l.created_at).toLocaleDateString()}</td><td><button class="btn btn-sm btn-primary btn-icon" onclick='editLocation(${JSON.stringify(l).replace(/'/g, "&apos;")})'><i class="bi bi-pencil"></i></button> <button class="btn btn-sm btn-danger btn-icon" onclick="deleteLocation(${l.id}, '${l.name.replace(/'/g, "\\'")}')\" ><i class="bi bi-trash"></i></button></td></tr>`).join('');
     } catch (error) { console.error('Locations error:', error); }
 }
 
