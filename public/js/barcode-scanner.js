@@ -236,12 +236,31 @@ class BarcodeScanner {
       const existingProduct = products.find(p => p.sku === barcode);
       
       if (existingProduct) {
-        alert(`Product "${existingProduct.name}" already exists!\n\nBarcode: ${barcode}`);
+        // Product exists - open edit modal
+        console.log('Product found, opening edit modal:', existingProduct);
+        
+        // Check if editProduct function exists
+        if (typeof editProduct !== 'function') {
+          console.error('editProduct function not found');
+          alert('Error: Cannot open product details. Please refresh the page.');
+          return;
+        }
+        
+        // Navigate to products page first
+        if (typeof showProducts === 'function') {
+          showProducts();
+        }
+        
+        // Small delay then open edit modal
+        setTimeout(() => {
+          editProduct(existingProduct);
+        }, 300);
+        
         return;
       }
 
-      // Product doesn't exist, open add modal
-      console.log('Opening add product modal...');
+      // Product doesn't exist, open add modal with barcode prefilled
+      console.log('Product not found, opening add modal...');
       
       // Check if function exists
       if (typeof showAddProductModal !== 'function') {
@@ -250,26 +269,33 @@ class BarcodeScanner {
         return;
       }
       
-      // Open modal
-      showAddProductModal();
+      // Navigate to products page first
+      if (typeof showProducts === 'function') {
+        showProducts();
+      }
       
-      // Wait a bit for modal to render, then fill in barcode
-      setTimeout(() => {
-        const barcodeInput = document.getElementById('addProductSku');
-        if (barcodeInput) {
-          barcodeInput.value = barcode;
-          console.log('Barcode filled in:', barcode);
-          
-          // Focus on product name field
-          const nameInput = document.getElementById('addProductName');
-          if (nameInput) {
-            nameInput.focus();
-            console.log('Focused on name input');
+      // Small delay then open modal
+      setTimeout(async () => {
+        await showAddProductModal();
+        
+        // Wait a bit more for modal to fully render
+        setTimeout(() => {
+          const barcodeInput = document.getElementById('addProductSku');
+          if (barcodeInput) {
+            barcodeInput.value = barcode;
+            console.log('Barcode filled in:', barcode);
+            
+            // Focus on product name field
+            const nameInput = document.getElementById('addProductName');
+            if (nameInput) {
+              nameInput.focus();
+              console.log('Focused on name input');
+            }
+          } else {
+            console.error('Could not find barcode input field');
           }
-        } else {
-          console.error('Could not find barcode input field');
-        }
-      }, 500);
+        }, 500);
+      }, 300);
       
     } catch (err) {
       console.error('Error in handleAddItem:', err);
@@ -347,6 +373,19 @@ class BarcodeScanner {
 
       alert(message);
       console.log('Stock check complete');
+      
+      // Navigate to stock page and filter by this product
+      if (typeof showStock === 'function') {
+        showStock();
+        
+        // Wait for stock page to load, then filter
+        setTimeout(() => {
+          if (typeof filterStockByProduct === 'function') {
+            filterStockByProduct(product.name);
+          }
+        }, 500);
+      }
+      
     } catch (err) {
       console.error('Error in handleCheckStock:', err);
       alert('Error checking stock: ' + err.message);
@@ -382,12 +421,51 @@ class BarcodeScanner {
         return;
       }
 
-      // For now, show stock and let user manually discard
-      alert(`Product found: ${product.name}\n\nPlease use the Stock page to discard items.`);
+      // Get stock batches for this product
+      const stockResponse = await fetch(`/api/stock?product_id=${product.id}`);
+      const stockData = await stockResponse.json();
       
-      if (typeof showStock === 'function') {
-        showStock();
+      let stock = [];
+      if (Array.isArray(stockData)) {
+        stock = stockData;
+      } else if (stockData.stock && Array.isArray(stockData.stock)) {
+        stock = stockData.stock;
+      } else if (stockData.data && Array.isArray(stockData.data)) {
+        stock = stockData.data;
       }
+
+      if (stock.length === 0) {
+        alert(`Product "${product.name}" has no stock to discard.`);
+        return;
+      }
+
+      if (stock.length === 1) {
+        // Only one batch - call discardStock directly
+        const batch = stock[0];
+        console.log('Single batch found, calling discardStock:', batch);
+        
+        if (typeof discardStock === 'function') {
+          discardStock(batch.id, product.name, batch.quantity);
+        } else {
+          alert('Error: discardStock function not available. Please refresh the page.');
+        }
+      } else {
+        // Multiple batches - navigate to stock page and filter
+        console.log(`Multiple batches found (${stock.length}), navigating to stock page`);
+        
+        if (typeof showStock === 'function') {
+          showStock();
+          
+          // Filter by product name after navigation
+          setTimeout(() => {
+            if (typeof filterStockByProduct === 'function') {
+              filterStockByProduct(product.name);
+            }
+            alert(`Product "${product.name}" has ${stock.length} batches.\n\nPlease select which batch to discard.`);
+          }, 500);
+        }
+      }
+      
     } catch (err) {
       console.error('Error in handleDiscardItem:', err);
       alert('Error: ' + err.message);
@@ -423,12 +501,51 @@ class BarcodeScanner {
         return;
       }
 
-      // For now, navigate to stock page
-      alert(`Product found: ${product.name}\n\nPlease use the Stock page to adjust quantities.`);
+      // Get stock batches for this product
+      const stockResponse = await fetch(`/api/stock?product_id=${product.id}`);
+      const stockData = await stockResponse.json();
       
-      if (typeof showStock === 'function') {
-        showStock();
+      let stock = [];
+      if (Array.isArray(stockData)) {
+        stock = stockData;
+      } else if (stockData.stock && Array.isArray(stockData.stock)) {
+        stock = stockData.stock;
+      } else if (stockData.data && Array.isArray(stockData.data)) {
+        stock = stockData.data;
       }
+
+      if (stock.length === 0) {
+        alert(`Product "${product.name}" has no stock to adjust.`);
+        return;
+      }
+
+      if (stock.length === 1) {
+        // Only one batch - call adjustStock directly
+        const batch = stock[0];
+        console.log('Single batch found, calling adjustStock:', batch);
+        
+        if (typeof adjustStock === 'function') {
+          adjustStock(batch.id, product.name, batch.quantity);
+        } else {
+          alert('Error: adjustStock function not available. Please refresh the page.');
+        }
+      } else {
+        // Multiple batches - navigate to stock page and filter
+        console.log(`Multiple batches found (${stock.length}), navigating to stock page`);
+        
+        if (typeof showStock === 'function') {
+          showStock();
+          
+          // Filter by product name after navigation
+          setTimeout(() => {
+            if (typeof filterStockByProduct === 'function') {
+              filterStockByProduct(product.name);
+            }
+            alert(`Product "${product.name}" has ${stock.length} batches.\n\nPlease select which batch to adjust.`);
+          }, 500);
+        }
+      }
+      
     } catch (err) {
       console.error('Error in handleAdjustStock:', err);
       alert('Error: ' + err.message);
