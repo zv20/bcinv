@@ -55,24 +55,34 @@ function renderStockTable(stock) {
 // Show product details with batches
 async function showProductDetails(productId) {
     try {
-        // Fetch product details
-        const response = await fetch(`${API_URL}/products/${productId}`);
-        if (!response.ok) {
-            // If specific endpoint doesn't exist, fetch all and find it
-            const allProductsResp = await fetch(`${API_URL}/products?limit=1000`);
-            const allData = await allProductsResp.json();
-            currentProduct = allData.products.find(p => p.id === productId);
-        } else {
-            currentProduct = await response.json();
+        console.log('Loading product details for ID:', productId);
+        
+        // Fetch all products and find the one we need
+        const allProductsResp = await fetch(`${API_URL}/products?limit=1000`);
+        const allData = await allProductsResp.json();
+        
+        // Handle different response formats
+        let products = [];
+        if (Array.isArray(allData)) {
+            products = allData;
+        } else if (allData.products && Array.isArray(allData.products)) {
+            products = allData.products;
+        } else if (allData.data && Array.isArray(allData.data)) {
+            products = allData.data;
         }
+        
+        currentProduct = products.find(p => p.id == productId);
+        
+        console.log('Found product:', currentProduct);
         
         if (!currentProduct) {
             alert('Product not found');
+            console.error('Product not found with ID:', productId);
             return;
         }
         
         // Fill product details
-        document.getElementById('detailProductName').textContent = currentProduct.name;
+        document.getElementById('detailProductName').textContent = currentProduct.name || 'N/A';
         document.getElementById('detailProductSku').textContent = currentProduct.sku || 'N/A';
         document.getElementById('detailProductDepartment').textContent = currentProduct.department_name || 'N/A';
         document.getElementById('detailProductSupplier').textContent = currentProduct.supplier_name || 'N/A';
@@ -86,15 +96,26 @@ async function showProductDetails(productId) {
         new bootstrap.Modal(document.getElementById('productDetailsModal')).show();
     } catch (error) {
         console.error('Error loading product details:', error);
-        alert('Failed to load product details');
+        alert('Failed to load product details: ' + error.message);
     }
 }
 
 // Load batches for current product
 async function loadProductBatches(productId) {
     try {
+        console.log('Loading batches for product ID:', productId);
+        
+        // Make sure we have current product info
+        if (!currentProduct) {
+            console.error('currentProduct is not set');
+            document.getElementById('batchesTable').innerHTML = '<tr><td colspan="6" class="text-center text-danger">Error: Product information not available</td></tr>';
+            return;
+        }
+        
         const response = await fetch(`${API_URL}/stock?product_id=${productId}`);
         const stockData = await response.json();
+        
+        console.log('Stock data response:', stockData);
         
         // Handle different response formats
         let batches = [];
@@ -106,19 +127,30 @@ async function loadProductBatches(productId) {
             batches = stockData.data;
         }
         
-        renderBatchesTable(batches);
+        console.log('Parsed batches:', batches);
+        
+        // Add product name to each batch for safer rendering
+        batches = batches.map(b => ({ ...b, _productName: currentProduct.name }));
+        
+        renderBatchesTable(batches, currentProduct.name);
     } catch (error) {
         console.error('Error loading batches:', error);
         document.getElementById('batchesTable').innerHTML = '<tr><td colspan="6" class="text-center text-danger">Failed to load batches</td></tr>';
     }
 }
 
-// Render batches table
-function renderBatchesTable(batches) {
+// Render batches table with product name parameter for safety
+function renderBatchesTable(batches, productName) {
     if (batches.length === 0) {
         document.getElementById('batchesTable').innerHTML = '<tr><td colspan="6" class="text-center text-muted">No stock batches for this product. Click "Add Batch" to add stock.</td></tr>';
         return;
     }
+    
+    // Use passed productName or fall back to currentProduct or batch data
+    const safeName = productName || (currentProduct ? currentProduct.name : (batches[0]._productName || 'Product'));
+    const escapedName = safeName.replace(/'/g, "\\'")
+    
+    console.log('Rendering batches with product name:', safeName);
     
     document.getElementById('batchesTable').innerHTML = batches.map(batch => {
         const daysLeft = batch.expiry_date ? Math.ceil((new Date(batch.expiry_date) - new Date()) / 86400000) : null;
@@ -131,10 +163,10 @@ function renderBatchesTable(batches) {
             <td class="${expiryClass}">${daysLeft !== null ? daysLeft + ' days' : 'N/A'}</td>
             <td><small>${batch.notes || '-'}</small></td>
             <td>
-                <button class="btn btn-sm btn-warning btn-icon" onclick="adjustStock(${batch.id}, '${currentProduct.name.replace(/'/g, "\\'")}', ${batch.quantity})">
+                <button class="btn btn-sm btn-warning btn-icon" onclick="adjustStock(${batch.id}, '${escapedName}', ${batch.quantity})">
                     <i class="bi bi-pencil"></i>
                 </button>
-                <button class="btn btn-sm btn-danger btn-icon" onclick="discardStock(${batch.id}, '${currentProduct.name.replace(/'/g, "\\'")}', ${batch.quantity})">
+                <button class="btn btn-sm btn-danger btn-icon" onclick="discardStock(${batch.id}, '${escapedName}', ${batch.quantity})">
                     <i class="bi bi-trash"></i>
                 </button>
             </td>
