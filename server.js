@@ -1057,11 +1057,7 @@ app.post('/api/stock/discard', async (req, res) => {
     
     const batch = batchResult.rows[0];
     
-    await client.query(
-      `INSERT INTO discarded_items (batch_id, product_id, quantity, reason, notes)
-       VALUES ($1, $2, $3, $4, $5)`,
-      [batch_id, batch.product_id, quantity, reason, emptyToNull(notes)]
-    );
+    // Removed INSERT INTO discarded_items - table doesn't exist
     
     const newQuantity = batch.quantity - quantity;
     if (newQuantity <= 0) {
