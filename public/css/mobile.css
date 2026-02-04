@@ -234,7 +234,8 @@ body.mobile {
   padding: 16px;
   display: flex;
   align-items: center;
-  gap: 16px;
+  justify-content: space-between;
+  gap: 12px;
   color: white;
 }
 
@@ -247,6 +248,7 @@ body.mobile {
   display: flex;
   align-items: center;
   justify-content: center;
+  flex-shrink: 0;
 }
 
 .barcode-scanner-close svg {
@@ -254,16 +256,73 @@ body.mobile {
   height: 24px;
 }
 
-.barcode-scanner-title {
+.barcode-scanner-header-content {
   flex: 1;
+  min-width: 0;
+}
+
+.barcode-scanner-title {
   margin: 0;
   font-size: 18px;
   font-weight: 600;
 }
 
 .barcode-scanner-action-label {
-  font-size: 14px;
+  font-size: 13px;
   opacity: 0.8;
+  margin-top: 2px;
+}
+
+/* Continuous Toggle Switch */
+.continuous-toggle {
+  flex-shrink: 0;
+}
+
+.toggle-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.toggle-label input[type="checkbox"] {
+  display: none;
+}
+
+.toggle-slider {
+  position: relative;
+  width: 44px;
+  height: 24px;
+  background: rgba(255, 255, 255, 0.3);
+  border-radius: 24px;
+  transition: background 0.3s;
+}
+
+.toggle-slider::before {
+  content: '';
+  position: absolute;
+  width: 20px;
+  height: 20px;
+  left: 2px;
+  top: 2px;
+  background: white;
+  border-radius: 50%;
+  transition: transform 0.3s;
+}
+
+.toggle-label input[type="checkbox"]:checked + .toggle-slider {
+  background: var(--success-color);
+}
+
+.toggle-label input[type="checkbox"]:checked + .toggle-slider::before {
+  transform: translateX(20px);
+}
+
+.toggle-text {
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
 }
 
 .barcode-scanner-reader {
@@ -295,6 +354,59 @@ body.mobile {
 
 .barcode-scanner-manual input {
   flex: 1;
+}
+
+/* Scanner Footer with Done Button */
+.barcode-scanner-footer {
+  background: rgba(0, 0, 0, 0.8);
+  padding: 16px;
+  display: flex;
+  justify-content: center;
+}
+
+.barcode-scanner-footer .btn {
+  min-width: 200px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+/* Toast Notifications */
+.scanner-toast {
+  position: fixed;
+  top: 20px;
+  left: 50%;
+  transform: translateX(-50%) translateY(-100px);
+  background: rgba(0, 0, 0, 0.9);
+  color: white;
+  padding: 12px 24px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  z-index: 5000;
+  opacity: 0;
+  transition: all 0.3s ease-out;
+  max-width: 90%;
+  text-align: center;
+}
+
+.scanner-toast.show {
+  transform: translateX(-50%) translateY(0);
+  opacity: 1;
+}
+
+.scanner-toast.success {
+  background: var(--success-color);
+}
+
+.scanner-toast.error {
+  background: var(--danger-color);
+}
+
+.scanner-toast.info {
+  background: var(--primary-color);
 }
 
 /* Search Overlay */
