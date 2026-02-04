@@ -97,16 +97,16 @@ class MobileNav {
           </div>
         </div>
         
-        <div class="camera-action-item" data-action="check-stock">
+        <div class="camera-action-item" data-action="adjust-stock">
           <div class="camera-action-icon">
             <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
-                d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
+                d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
             </svg>
           </div>
           <div class="camera-action-text">
-            <h4>Check Stock</h4>
-            <p>View item details and expiration</p>
+            <h4>Adjust Stock</h4>
+            <p>Manual count with reason tracking</p>
           </div>
         </div>
         
@@ -118,21 +118,21 @@ class MobileNav {
             </svg>
           </div>
           <div class="camera-action-text">
-            <h4>Discard Expired</h4>
-            <p>Remove expired items from inventory</p>
+            <h4>Discard Item</h4>
+            <p>Scan barcode to discard expired or damaged item</p>
           </div>
         </div>
         
-        <div class="camera-action-item" data-action="adjust-stock">
+        <div class="camera-action-item" data-action="check-stock">
           <div class="camera-action-icon">
             <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
-                d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+                d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"/>
             </svg>
           </div>
           <div class="camera-action-text">
-            <h4>Adjust Stock</h4>
-            <p>Manual count with reason tracking</p>
+            <h4>Check Item</h4>
+            <p>View item details and expiration</p>
           </div>
         </div>
       </div>
