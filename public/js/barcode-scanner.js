@@ -98,7 +98,7 @@ class BarcodeScanner {
     // Update action label
     const actionLabel = document.querySelector('.barcode-scanner-action-label');
     const actionNames = {
-      'add-item': 'Add New Product',
+      'add-item': 'Add/Edit Product',
       'check-stock': 'Check Stock Levels',
       'discard-item': 'Discard Expired Item',
       'adjust-stock': 'Adjust Stock Count'
@@ -236,13 +236,13 @@ class BarcodeScanner {
       const existingProduct = products.find(p => p.sku === barcode);
       
       if (existingProduct) {
-        // Product exists - open product details modal showing all batches
-        console.log('Product found, opening product details:', existingProduct);
+        // Product exists - open EDIT modal with product data prefilled
+        console.log('Product found, opening EDIT modal:', existingProduct);
         
-        // Check if showProductDetails function exists
-        if (typeof showProductDetails !== 'function') {
-          console.error('showProductDetails function not found');
-          alert('Error: Cannot open product details. Please refresh the page.');
+        // Check if editProduct function exists
+        if (typeof editProduct !== 'function') {
+          console.error('editProduct function not found');
+          alert('Error: Cannot open edit form. Please refresh the page.');
           return;
         }
         
@@ -251,16 +251,16 @@ class BarcodeScanner {
           showProducts();
         }
         
-        // Small delay then open product details modal
+        // Small delay then open edit modal
         setTimeout(() => {
-          showProductDetails(existingProduct.id);
+          editProduct(existingProduct);
         }, 300);
         
         return;
       }
 
-      // Product doesn't exist, open add modal with barcode prefilled
-      console.log('Product not found, opening add modal...');
+      // Product doesn't exist, open ADD modal with barcode prefilled
+      console.log('Product not found, opening ADD modal...');
       
       // Check if function exists
       if (typeof showAddProductModal !== 'function') {
