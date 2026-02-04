@@ -92,8 +92,8 @@ class MobileNav {
             </svg>
           </div>
           <div class="camera-action-text">
-            <h4>Add Item</h4>
-            <p>Scan barcode to add new product</p>
+            <h4>Add/Edit Item</h4>
+            <p>Scan barcode to add or edit an item</p>
           </div>
         </div>
         
