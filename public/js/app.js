@@ -44,11 +44,17 @@ function filterStockByProduct(productName) {
 
 // Render stock table (extracted from loadStock)
 function renderStockTable(stock) {
-    document.getElementById('stockTable').innerHTML = stock.length === 0 ? '<tr><td colspan="7" class="text-center">No stock</td></tr>' :
+    const stockTable = document.getElementById('stockTable');
+    if (!stockTable) {
+        console.warn('Stock table element not found - Stock view may have been removed');
+        return;
+    }
+    
+    stockTable.innerHTML = stock.length === 0 ? '<tr><td colspan="7" class="text-center">No stock</td></tr>' :
         stock.map(s => {
             const daysLeft = s.expiry_date ? Math.ceil((new Date(s.expiry_date) - new Date()) / 86400000) : null;
             const cls = daysLeft !== null && daysLeft <= 7 ? 'text-danger' : daysLeft !== null && daysLeft <= 14 ? 'text-warning' : '';
-            return `<tr><td>${s.product_name}</td><td>${s.sku || '-'}</td><td>${s.location_name || '-'}</td><td>${parseFloat(s.quantity).toFixed(2)} ${s.unit}</td><td class="${cls}">${s.expiry_date ? new Date(s.expiry_date).toLocaleDateString() : '-'}</td><td class="${cls}">${daysLeft !== null ? daysLeft + ' days' : '-'}</td><td><button class="btn btn-sm btn-warning btn-icon" onclick="adjustStock(${s.id}, '${s.product_name.replace(/'/g, "\\'")}, ${s.quantity})"><i class="bi bi-pencil"></i></button> <button class="btn btn-sm btn-danger btn-icon" onclick="discardStock(${s.id}, '${s.product_name.replace(/'/g, "\\'")}', ${s.quantity})"><i class="bi bi-trash"></i></button></td></tr>`;
+            return `<tr><td>${s.product_name}</td><td>${s.sku || '-'}</td><td>${s.location_name || '-'}</td><td>${parseFloat(s.quantity).toFixed(2)} ${s.unit}</td><td class="${cls}">${s.expiry_date ? new Date(s.expiry_date).toLocaleDateString() : '-'}</td><td class="${cls}">${daysLeft !== null ? daysLeft + ' days' : '-'}</td><td><button class="btn btn-sm btn-warning btn-icon" onclick="adjustStock(${s.id}, '${s.product_name.replace(/'/g, "\\'")}', ${s.quantity})"><i class="bi bi-pencil"></i></button> <button class="btn btn-sm btn-danger btn-icon" onclick="discardStock(${s.id}, '${s.product_name.replace(/'/g, "\\'")}', ${s.quantity})"><i class="bi bi-trash"></i></button></td></tr>`;
         }).join('');
 }
 
@@ -366,7 +372,11 @@ async function addStock() {
         if (response.ok) { 
             bootstrap.Modal.getInstance(document.getElementById('addStockModal')).hide();
             clearCache();
-            await loadStock();
+            // Only reload stock view if it exists
+            const stockTable = document.getElementById('stockTable');
+            if (stockTable) {
+                await loadStock();
+            }
             // If we were viewing product details, reload batches
             if (currentProduct && data.product_id == currentProduct.id) {
                 await loadProductBatches(currentProduct.id);
@@ -382,15 +392,32 @@ async function adjustStock(batchId, productName, currentQty) {
     if (newQty === null) return;
     const notes = prompt('Reason (optional):');
     try {
-        await fetch(`${API_URL}/stock/adjust`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ batch_id: batchId, quantity: parseFloat(newQty), reason: 'manual_audit', notes }) });
+        const response = await fetch(`${API_URL}/stock/adjust`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ batch_id: batchId, quantity: parseFloat(newQty), reason: 'manual_audit', notes }) });
+        
+        if (!response.ok) {
+            const error = await response.json();
+            alert('Error adjusting stock: ' + (error.error || 'Unknown error'));
+            return;
+        }
+        
         clearCache();
-        await loadStock();
+        
+        // Only reload stock view if it exists
+        const stockTable = document.getElementById('stockTable');
+        if (stockTable) {
+            await loadStock();
+        }
+        
         // If we were viewing product details, reload batches
         if (currentProduct) {
             await loadProductBatches(currentProduct.id);
         }
+        
         alert('Adjusted');
-    } catch (error) { console.error('Adjust error:', error); }
+    } catch (error) { 
+        console.error('Adjust error:', error);
+        alert('Failed to adjust stock: ' + error.message);
+    }
 }
 
 async function discardStock(batchId, productName, quantity) {
@@ -399,15 +426,32 @@ async function discardStock(batchId, productName, quantity) {
     const qtyToDiscard = prompt('Quantity:', quantity);
     if (!qtyToDiscard) return;
     try {
-        await fetch(`${API_URL}/stock/discard`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ batch_id: batchId, quantity: parseFloat(qtyToDiscard), reason: {'1': 'expired', '2': 'damaged', '3': 'other'}[reason] || 'other', notes: '' }) });
+        const response = await fetch(`${API_URL}/stock/discard`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ batch_id: batchId, quantity: parseFloat(qtyToDiscard), reason: {'1': 'expired', '2': 'damaged', '3': 'other'}[reason] || 'other', notes: '' }) });
+        
+        if (!response.ok) {
+            const error = await response.json();
+            alert('Error discarding stock: ' + (error.error || 'Unknown error'));
+            return;
+        }
+        
         clearCache();
-        await loadStock();
+        
+        // Only reload stock view if it exists
+        const stockTable = document.getElementById('stockTable');
+        if (stockTable) {
+            await loadStock();
+        }
+        
         // If we were viewing product details, reload batches
         if (currentProduct) {
             await loadProductBatches(currentProduct.id);
         }
+        
         alert('Discarded');
-    } catch (error) { console.error('Discard error:', error); }
+    } catch (error) { 
+        console.error('Discard error:', error);
+        alert('Failed to discard stock: ' + error.message);
+    }
 }
 
 async function loadExpiring() {
