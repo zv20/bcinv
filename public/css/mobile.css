@@ -31,6 +31,83 @@
   }
 }
 
+/* Mobile table responsiveness */
+@media (max-width: 767px) {
+  /* Make tables horizontally scrollable */
+  .table-responsive {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    margin: 0 -12px; /* Extend to card edges */
+  }
+  
+  /* Reduce table font size and padding for mobile */
+  .table {
+    font-size: 13px;
+    margin-bottom: 0;
+  }
+  
+  .table thead th {
+    font-size: 12px;
+    font-weight: 600;
+    padding: 10px 8px;
+    white-space: nowrap;
+    border-bottom: 2px solid var(--border-color);
+  }
+  
+  .table tbody td {
+    padding: 10px 8px;
+    vertical-align: middle;
+  }
+  
+  /* Compact action buttons on mobile */
+  .table .btn-icon {
+    padding: 4px 6px;
+    font-size: 12px;
+    margin: 2px;
+  }
+  
+  .table .btn-icon i {
+    font-size: 14px;
+  }
+  
+  /* Ensure action column stays visible */
+  .table th:last-child,
+  .table td:last-child {
+    position: sticky;
+    right: 0;
+    background: var(--bg-primary);
+    box-shadow: -2px 0 4px rgba(0, 0, 0, 0.05);
+  }
+  
+  .table thead th:last-child {
+    background: var(--bg-primary);
+  }
+  
+  /* Card padding adjustment for better table display */
+  .card-body {
+    padding: 12px;
+  }
+  
+  /* Page title and button adjustments */
+  h2 {
+    font-size: 22px;
+    margin-bottom: 12px;
+  }
+  
+  .d-flex.justify-content-between {
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  
+  .d-flex.justify-content-between h2 {
+    flex: 1 1 100%;
+  }
+  
+  .d-flex.justify-content-between .btn {
+    flex: 1 1 100%;
+  }
+}
+
 /* Base mobile styles */
 body.mobile {
   margin: 0;
