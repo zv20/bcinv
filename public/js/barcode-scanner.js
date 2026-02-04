@@ -99,9 +99,9 @@ class BarcodeScanner {
     const actionLabel = document.querySelector('.barcode-scanner-action-label');
     const actionNames = {
       'add-item': 'Add/Edit Product',
-      'check-stock': 'Check Stock Levels',
-      'discard-item': 'Discard Expired Item',
-      'adjust-stock': 'Adjust Stock Count'
+      'adjust-stock': 'Adjust Stock Count',
+      'discard-item': 'Discard Item',
+      'check-stock': 'Check Item'
     };
     if (actionLabel) {
       actionLabel.textContent = actionNames[action] || 'Scan Item';
