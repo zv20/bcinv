@@ -393,13 +393,13 @@ class BarcodeScanner {
 
       this.showToast(`Found: ${product.name}`, 'success');
       
-      // Navigate to product detail page
+      // Navigate to product detail modal
       if (typeof showProducts === 'function') {
         showProducts();
         
         setTimeout(() => {
-          if (typeof viewProduct === 'function') {
-            viewProduct(product.id);
+          if (typeof showProductDetails === 'function') {
+            showProductDetails(product.id);
           }
         }, 500);
       }
@@ -443,19 +443,31 @@ class BarcodeScanner {
       const batches = batchData.batches || [];
       
       // Ask for expiration date
-      const expiryDate = prompt(`Product: ${product.name}\n\nEnter expiration date (YYYY-MM-DD):`);
+      const expiryDateInput = prompt(`Product: ${product.name}\n\nEnter expiration date (YYYY-MM-DD):`);
       
-      if (!expiryDate) {
+      if (!expiryDateInput) {
         this.showToast('Adjustment cancelled', 'info');
         return;
       }
       
-      // Check if batch with this date exists
-      const matchingBatch = batches.find(b => b.expiry_date === expiryDate);
+      const normalizeDate = (val) => {
+        if (!val) return null;
+        // If it's a Date object
+        if (val instanceof Date) {
+          return val.toISOString().slice(0, 10);
+        }
+        // If it's a string like '2026-02-05T00:00:00.000Z' or '2026-02-05'
+        return val.toString().slice(0, 10);
+      };
+      
+      const targetDate = normalizeDate(expiryDateInput.trim());
+      
+      // Check if batch with this date exists (compare only date part)
+      const matchingBatch = batches.find(b => normalizeDate(b.expiry_date) === targetDate);
       
       if (matchingBatch) {
         // Batch exists - adjust it
-        const newQty = prompt(`Batch found with expiry ${expiryDate}\nCurrent quantity: ${matchingBatch.quantity}\n\nEnter new quantity:`);
+        const newQty = prompt(`Batch found with expiry ${targetDate}\nCurrent quantity: ${matchingBatch.quantity}\n\nEnter new quantity:`);
         
         if (newQty === null) {
           this.showToast('Adjustment cancelled', 'info');
@@ -470,7 +482,7 @@ class BarcodeScanner {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             batch_id: matchingBatch.id,
-            quantity: parseInt(newQty),
+            quantity: parseInt(newQty, 10),
             reason: reason,
             notes: `Scanned barcode: ${barcode}`
           })
@@ -483,7 +495,7 @@ class BarcodeScanner {
         }
       } else {
         // No batch with this date - create new batch
-        const qty = prompt(`No batch found with expiry ${expiryDate}\n\nEnter quantity for new batch:`);
+        const qty = prompt(`No batch found with expiry ${targetDate}\n\nEnter quantity for new batch:`);
         
         if (qty === null) {
           this.showToast('Cancelled', 'info');
@@ -495,8 +507,8 @@ class BarcodeScanner {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            quantity: parseInt(qty),
-            expiration_date: expiryDate,
+            quantity: parseInt(qty, 10),
+            expiration_date: targetDate,
             notes: `Created via scan - Barcode: ${barcode}`
           })
         });
@@ -552,24 +564,34 @@ class BarcodeScanner {
       const reasonText = reason === '1' ? 'Expired' : 'Damaged';
       
       // Ask for date
-      const expiryDate = prompt(`Enter ${reasonText.toLowerCase()} date (YYYY-MM-DD):`);
+      const expiryDateInput = prompt(`Enter ${reasonText.toLowerCase()} date (YYYY-MM-DD):`);
       
-      if (!expiryDate) {
+      if (!expiryDateInput) {
         this.showToast('Discard cancelled', 'info');
         return;
       }
+      
+      const normalizeDate = (val) => {
+        if (!val) return null;
+        if (val instanceof Date) {
+          return val.toISOString().slice(0, 10);
+        }
+        return val.toString().slice(0, 10);
+      };
+      
+      const targetDate = normalizeDate(expiryDateInput.trim());
       
       // Get existing batches
       const batchResponse = await fetch(`/api/products/${product.id}/batches`);
       const batchData = await batchResponse.json();
       const batches = batchData.batches || [];
       
-      // Find batch with matching date
-      const matchingBatch = batches.find(b => b.expiry_date === expiryDate);
+      // Find batch with matching date (compare only date part)
+      const matchingBatch = batches.find(b => normalizeDate(b.expiry_date) === targetDate);
       
       if (matchingBatch) {
         // Batch exists - discard from it
-        const qty = prompt(`Batch found with date ${expiryDate}\nCurrent quantity: ${matchingBatch.quantity}\n\nEnter quantity to discard:`);
+        const qty = prompt(`Batch found with date ${targetDate}\nCurrent quantity: ${matchingBatch.quantity}\n\nEnter quantity to discard:`);
         
         if (qty === null) {
           this.showToast('Discard cancelled', 'info');
@@ -582,7 +604,7 @@ class BarcodeScanner {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             batch_id: matchingBatch.id,
-            quantity: parseInt(qty),
+            quantity: parseInt(qty, 10),
             reason: reasonText,
             notes: `Scanned barcode: ${barcode}`
           })
@@ -595,7 +617,7 @@ class BarcodeScanner {
         }
       } else {
         // No batch found - create negative batch for tracking
-        const qty = prompt(`No batch with date ${expiryDate}\n\nThis will create a negative batch for tracking.\n\nEnter quantity discarded:`);
+        const qty = prompt(`No batch with date ${targetDate}\n\nThis will create a negative batch for tracking.\n\nEnter quantity discarded:`);
         
         if (qty === null) {
           this.showToast('Cancelled', 'info');
@@ -607,8 +629,8 @@ class BarcodeScanner {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            quantity: -parseInt(qty),
-            expiration_date: expiryDate,
+            quantity: -parseInt(qty, 10),
+            expiration_date: targetDate,
             notes: `${reasonText} - Never logged. Barcode: ${barcode}`,
             batch_number: `DISCARD-${Date.now()}`
           })
