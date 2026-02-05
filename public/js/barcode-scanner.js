@@ -7,6 +7,7 @@ class BarcodeScanner {
   constructor() {
     this.scanner = null;
     this.isScanning = false;
+    this.isProcessing = false; // Prevent multiple simultaneous scans
     this.currentAction = null;
     this.continuousMode = false;
     this.scannerElement = null;
@@ -15,6 +16,7 @@ class BarcodeScanner {
 
   init() {
     this.createScannerUI();
+    this.createModalUI();
     this.attachEventListeners();
   }
 
@@ -74,6 +76,242 @@ class BarcodeScanner {
 
     document.body.insertAdjacentHTML('beforeend', scannerHTML);
     this.scannerElement = document.querySelector('.barcode-scanner-overlay');
+  }
+
+  createModalUI() {
+    const modalHTML = `
+      <!-- Custom Input Modal -->
+      <div class="scanner-modal-overlay" id="scanner-input-modal">
+        <div class="scanner-modal">
+          <div class="scanner-modal-header">
+            <h3 id="scanner-modal-title">Input Required</h3>
+          </div>
+          <div class="scanner-modal-body">
+            <p id="scanner-modal-message"></p>
+            <input type="text" id="scanner-modal-input" class="form-control" placeholder="">
+          </div>
+          <div class="scanner-modal-footer">
+            <button class="btn btn-secondary" id="scanner-modal-cancel">Cancel</button>
+            <button class="btn btn-primary" id="scanner-modal-submit">OK</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Custom Confirm Modal -->
+      <div class="scanner-modal-overlay" id="scanner-confirm-modal">
+        <div class="scanner-modal">
+          <div class="scanner-modal-header">
+            <h3 id="scanner-confirm-title">Confirm</h3>
+          </div>
+          <div class="scanner-modal-body">
+            <p id="scanner-confirm-message"></p>
+          </div>
+          <div class="scanner-modal-footer">
+            <button class="btn btn-secondary" id="scanner-confirm-no">No</button>
+            <button class="btn btn-primary" id="scanner-confirm-yes">Yes</button>
+          </div>
+        </div>
+      </div>
+    `;
+
+    document.body.insertAdjacentHTML('beforeend', modalHTML);
+
+    // Add modal styles
+    const style = document.createElement('style');
+    style.textContent = `
+      .scanner-modal-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.7);
+        z-index: 6000;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        padding: 20px;
+      }
+
+      .scanner-modal-overlay.active {
+        display: flex;
+      }
+
+      .scanner-modal {
+        background: white;
+        border-radius: 12px;
+        max-width: 400px;
+        width: 100%;
+        box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+        animation: modalSlideIn 0.3s ease-out;
+      }
+
+      @keyframes modalSlideIn {
+        from {
+          transform: translateY(-20px);
+          opacity: 0;
+        }
+        to {
+          transform: translateY(0);
+          opacity: 1;
+        }
+      }
+
+      .scanner-modal-header {
+        padding: 20px;
+        border-bottom: 1px solid #e5e7eb;
+      }
+
+      .scanner-modal-header h3 {
+        margin: 0;
+        font-size: 18px;
+        font-weight: 600;
+        color: #111827;
+      }
+
+      .scanner-modal-body {
+        padding: 20px;
+      }
+
+      .scanner-modal-body p {
+        margin: 0 0 16px 0;
+        color: #374151;
+        line-height: 1.5;
+        white-space: pre-line;
+      }
+
+      .scanner-modal-body .form-control {
+        width: 100%;
+        padding: 10px 12px;
+        border: 1px solid #d1d5db;
+        border-radius: 6px;
+        font-size: 16px;
+      }
+
+      .scanner-modal-body .form-control:focus {
+        outline: none;
+        border-color: #2563eb;
+        box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+      }
+
+      .scanner-modal-footer {
+        padding: 16px 20px;
+        border-top: 1px solid #e5e7eb;
+        display: flex;
+        gap: 12px;
+        justify-content: flex-end;
+      }
+
+      .scanner-modal-footer .btn {
+        padding: 10px 20px;
+        border-radius: 6px;
+        font-weight: 500;
+        cursor: pointer;
+        transition: all 0.2s;
+      }
+
+      .scanner-modal-footer .btn-secondary {
+        background: #f3f4f6;
+        color: #374151;
+        border: none;
+      }
+
+      .scanner-modal-footer .btn-secondary:hover {
+        background: #e5e7eb;
+      }
+
+      .scanner-modal-footer .btn-primary {
+        background: #2563eb;
+        color: white;
+        border: none;
+      }
+
+      .scanner-modal-footer .btn-primary:hover {
+        background: #1d4ed8;
+      }
+    `;
+    document.head.appendChild(style);
+  }
+
+  showInputModal(title, message, placeholder = '', defaultValue = '') {
+    return new Promise((resolve) => {
+      const modal = document.getElementById('scanner-input-modal');
+      const titleEl = document.getElementById('scanner-modal-title');
+      const messageEl = document.getElementById('scanner-modal-message');
+      const input = document.getElementById('scanner-modal-input');
+      const submitBtn = document.getElementById('scanner-modal-submit');
+      const cancelBtn = document.getElementById('scanner-modal-cancel');
+
+      titleEl.textContent = title;
+      messageEl.textContent = message;
+      input.placeholder = placeholder;
+      input.value = defaultValue;
+      modal.classList.add('active');
+      
+      setTimeout(() => input.focus(), 100);
+
+      const handleSubmit = () => {
+        const value = input.value.trim();
+        modal.classList.remove('active');
+        cleanup();
+        resolve(value || null);
+      };
+
+      const handleCancel = () => {
+        modal.classList.remove('active');
+        cleanup();
+        resolve(null);
+      };
+
+      const handleKeyPress = (e) => {
+        if (e.key === 'Enter') handleSubmit();
+        if (e.key === 'Escape') handleCancel();
+      };
+
+      const cleanup = () => {
+        submitBtn.removeEventListener('click', handleSubmit);
+        cancelBtn.removeEventListener('click', handleCancel);
+        input.removeEventListener('keypress', handleKeyPress);
+      };
+
+      submitBtn.addEventListener('click', handleSubmit);
+      cancelBtn.addEventListener('click', handleCancel);
+      input.addEventListener('keypress', handleKeyPress);
+    });
+  }
+
+  showConfirmModal(title, message) {
+    return new Promise((resolve) => {
+      const modal = document.getElementById('scanner-confirm-modal');
+      const titleEl = document.getElementById('scanner-confirm-title');
+      const messageEl = document.getElementById('scanner-confirm-message');
+      const yesBtn = document.getElementById('scanner-confirm-yes');
+      const noBtn = document.getElementById('scanner-confirm-no');
+
+      titleEl.textContent = title;
+      messageEl.textContent = message;
+      modal.classList.add('active');
+
+      const handleYes = () => {
+        modal.classList.remove('active');
+        cleanup();
+        resolve(true);
+      };
+
+      const handleNo = () => {
+        modal.classList.remove('active');
+        cleanup();
+        resolve(false);
+      };
+
+      const cleanup = () => {
+        yesBtn.removeEventListener('click', handleYes);
+        noBtn.removeEventListener('click', handleNo);
+      };
+
+      yesBtn.addEventListener('click', handleYes);
+      noBtn.addEventListener('click', handleNo);
+    });
   }
 
   attachEventListeners() {
@@ -174,6 +412,9 @@ class BarcodeScanner {
       manualInput.value = '';
     }
 
+    // Reset processing flag
+    this.isProcessing = false;
+
     // Start camera
     await this.startCamera();
   }
@@ -228,6 +469,7 @@ class BarcodeScanner {
     }
 
     this.isScanning = false;
+    this.isProcessing = false;
     this.scanner = null;
     this.currentAction = null;
     this.continuousMode = false;
@@ -236,7 +478,16 @@ class BarcodeScanner {
   }
 
   async handleScanResult(barcode) {
+    // Prevent processing if already handling a scan
+    if (this.isProcessing) {
+      console.log('Already processing a scan, ignoring...');
+      return;
+    }
+
     console.log('Processing barcode:', barcode, 'for action:', this.currentAction);
+    
+    // Set processing flag immediately
+    this.isProcessing = true;
     
     // Store action before processing
     const action = this.currentAction;
@@ -248,9 +499,14 @@ class BarcodeScanner {
       manualInput.value = '';
     }
     
-    // If NOT continuous mode, pause scanner temporarily
-    if (!continuous && this.scanner && this.isScanning) {
-      await this.scanner.pause();
+    // STOP scanner during user interaction (critical for preventing loop)
+    if (this.scanner && this.isScanning) {
+      try {
+        await this.scanner.pause();
+        console.log('Scanner paused for user interaction');
+      } catch (err) {
+        console.error('Error pausing scanner:', err);
+      }
     }
 
     // Process based on action
@@ -272,21 +528,34 @@ class BarcodeScanner {
           console.error('Unknown action:', action);
       }
       
+      // Reset processing flag after completion
+      this.isProcessing = false;
+      
       // If continuous mode is OFF, close scanner
       if (!continuous) {
         await this.closeScanner();
       } else {
-        // Resume scanner for next scan
+        // Resume scanner for next scan only if continuous mode ON
         if (this.scanner && this.isScanning) {
-          await this.scanner.resume();
+          try {
+            await this.scanner.resume();
+            console.log('Scanner resumed for continuous mode');
+          } catch (err) {
+            console.error('Error resuming scanner:', err);
+          }
         }
       }
     } catch (error) {
       console.error('Error processing scan:', error);
+      this.isProcessing = false;
       
       // Resume scanner even on error if continuous
       if (continuous && this.scanner && this.isScanning) {
-        await this.scanner.resume();
+        try {
+          await this.scanner.resume();
+        } catch (err) {
+          console.error('Error resuming scanner:', err);
+        }
       }
     }
   }
@@ -400,8 +669,11 @@ class BarcodeScanner {
         setTimeout(() => {
           if (typeof showProductDetails === 'function') {
             showProductDetails(product.id);
+          } else {
+            console.error('showProductDetails function not found');
+            this.showToast('Error opening product details', 'error');
           }
-        }, 500);
+        }, 800);
       }
       
     } catch (err) {
@@ -442,8 +714,12 @@ class BarcodeScanner {
       const batchData = await batchResponse.json();
       const batches = batchData.batches || [];
       
-      // Ask for expiration date
-      const expiryDateInput = prompt(`Product: ${product.name}\n\nEnter expiration date (YYYY-MM-DD):`);
+      // Ask for expiration date using custom modal
+      const expiryDateInput = await this.showInputModal(
+        'Adjust Stock',
+        `Product: ${product.name}\n\nEnter expiration date:`,
+        'YYYY-MM-DD'
+      );
       
       if (!expiryDateInput) {
         this.showToast('Adjustment cancelled', 'info');
@@ -452,29 +728,56 @@ class BarcodeScanner {
       
       const normalizeDate = (val) => {
         if (!val) return null;
-        // If it's a Date object
+        // Convert to Date object first for consistent handling
+        let date;
         if (val instanceof Date) {
-          return val.toISOString().slice(0, 10);
+          date = val;
+        } else {
+          date = new Date(val);
         }
-        // If it's a string like '2026-02-05T00:00:00.000Z' or '2026-02-05'
-        return val.toString().slice(0, 10);
+        
+        // Check if valid date
+        if (isNaN(date.getTime())) {
+          console.error('Invalid date:', val);
+          return null;
+        }
+        
+        // Format as YYYY-MM-DD
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        
+        return `${year}-${month}-${day}`;
       };
       
       const targetDate = normalizeDate(expiryDateInput.trim());
+      console.log('Target date:', targetDate);
       
       // Check if batch with this date exists (compare only date part)
-      const matchingBatch = batches.find(b => normalizeDate(b.expiry_date) === targetDate);
+      const matchingBatch = batches.find(b => {
+        const batchDate = normalizeDate(b.expiry_date);
+        console.log('Comparing batch date:', b.expiry_date, '→', batchDate, 'with target:', targetDate);
+        return batchDate === targetDate;
+      });
       
       if (matchingBatch) {
         // Batch exists - adjust it
-        const newQty = prompt(`Batch found with expiry ${targetDate}\nCurrent quantity: ${matchingBatch.quantity}\n\nEnter new quantity:`);
+        const newQty = await this.showInputModal(
+          'Adjust Batch',
+          `Batch found with expiry ${targetDate}\nCurrent quantity: ${matchingBatch.quantity}\n\nEnter new quantity:`,
+          'Quantity'
+        );
         
         if (newQty === null) {
           this.showToast('Adjustment cancelled', 'info');
           return;
         }
         
-        const reason = prompt('Reason for adjustment:') || 'Inventory count';
+        const reason = await this.showInputModal(
+          'Adjustment Reason',
+          'Reason for adjustment:',
+          'e.g., Inventory count'
+        );
         
         // Call adjust API
         const adjustResponse = await fetch('/api/stock/adjust', {
@@ -483,7 +786,7 @@ class BarcodeScanner {
           body: JSON.stringify({
             batch_id: matchingBatch.id,
             quantity: parseInt(newQty, 10),
-            reason: reason,
+            reason: reason || 'Inventory count',
             notes: `Scanned barcode: ${barcode}`
           })
         });
@@ -495,7 +798,11 @@ class BarcodeScanner {
         }
       } else {
         // No batch with this date - create new batch
-        const qty = prompt(`No batch found with expiry ${targetDate}\n\nEnter quantity for new batch:`);
+        const qty = await this.showInputModal(
+          'Create New Batch',
+          `No batch found with expiry ${targetDate}\n\nEnter quantity for new batch:`,
+          'Quantity'
+        );
         
         if (qty === null) {
           this.showToast('Cancelled', 'info');
@@ -553,8 +860,12 @@ class BarcodeScanner {
         return;
       }
 
-      // Ask if expired or damaged
-      const reason = prompt(`Product: ${product.name}\n\nReason for discard:\n1 = Expired\n2 = Damaged`);
+      // Ask if expired or damaged using custom modal
+      const reason = await this.showInputModal(
+        'Discard Reason',
+        `Product: ${product.name}\n\nReason for discard:\n1 = Expired\n2 = Damaged`,
+        '1 or 2'
+      );
       
       if (!reason) {
         this.showToast('Discard cancelled', 'info');
@@ -564,7 +875,11 @@ class BarcodeScanner {
       const reasonText = reason === '1' ? 'Expired' : 'Damaged';
       
       // Ask for date
-      const expiryDateInput = prompt(`Enter ${reasonText.toLowerCase()} date (YYYY-MM-DD):`);
+      const expiryDateInput = await this.showInputModal(
+        'Discard Date',
+        `Enter ${reasonText.toLowerCase()} date:`,
+        'YYYY-MM-DD'
+      );
       
       if (!expiryDateInput) {
         this.showToast('Discard cancelled', 'info');
@@ -573,13 +888,27 @@ class BarcodeScanner {
       
       const normalizeDate = (val) => {
         if (!val) return null;
+        let date;
         if (val instanceof Date) {
-          return val.toISOString().slice(0, 10);
+          date = val;
+        } else {
+          date = new Date(val);
         }
-        return val.toString().slice(0, 10);
+        
+        if (isNaN(date.getTime())) {
+          console.error('Invalid date:', val);
+          return null;
+        }
+        
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        
+        return `${year}-${month}-${day}`;
       };
       
       const targetDate = normalizeDate(expiryDateInput.trim());
+      console.log('Target date:', targetDate);
       
       // Get existing batches
       const batchResponse = await fetch(`/api/products/${product.id}/batches`);
@@ -587,11 +916,19 @@ class BarcodeScanner {
       const batches = batchData.batches || [];
       
       // Find batch with matching date (compare only date part)
-      const matchingBatch = batches.find(b => normalizeDate(b.expiry_date) === targetDate);
+      const matchingBatch = batches.find(b => {
+        const batchDate = normalizeDate(b.expiry_date);
+        console.log('Comparing batch date:', b.expiry_date, '→', batchDate, 'with target:', targetDate);
+        return batchDate === targetDate;
+      });
       
       if (matchingBatch) {
         // Batch exists - discard from it
-        const qty = prompt(`Batch found with date ${targetDate}\nCurrent quantity: ${matchingBatch.quantity}\n\nEnter quantity to discard:`);
+        const qty = await this.showInputModal(
+          'Discard Quantity',
+          `Batch found with date ${targetDate}\nCurrent quantity: ${matchingBatch.quantity}\n\nEnter quantity to discard:`,
+          'Quantity'
+        );
         
         if (qty === null) {
           this.showToast('Discard cancelled', 'info');
@@ -617,7 +954,11 @@ class BarcodeScanner {
         }
       } else {
         // No batch found - create negative batch for tracking
-        const qty = prompt(`No batch with date ${targetDate}\n\nThis will create a negative batch for tracking.\n\nEnter quantity discarded:`);
+        const qty = await this.showInputModal(
+          'Track Discarded Items',
+          `No batch with date ${targetDate}\n\nThis will create a negative batch for tracking.\n\nEnter quantity discarded:`,
+          'Quantity'
+        );
         
         if (qty === null) {
           this.showToast('Cancelled', 'info');
