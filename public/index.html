@@ -21,6 +21,117 @@
         .product-info-card .info-item { margin-bottom: 10px; }
         .product-info-card .info-label { font-weight: 600; color: #6c757d; }
 
+        /* Product Filters & Search */
+        .product-filters {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        
+        .filter-row {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 12px;
+            flex-wrap: wrap;
+        }
+        
+        .filter-group {
+            flex: 1;
+            min-width: 200px;
+        }
+        
+        .filter-group label {
+            display: block;
+            font-size: 13px;
+            font-weight: 600;
+            color: #6c757d;
+            margin-bottom: 6px;
+        }
+        
+        .filter-group select,
+        .filter-group input {
+            width: 100%;
+        }
+        
+        .active-filters {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+        
+        .filter-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 4px 10px;
+            background: #0d6efd;
+            color: white;
+            border-radius: 16px;
+            font-size: 13px;
+            font-weight: 500;
+        }
+        
+        .filter-badge i {
+            cursor: pointer;
+            font-size: 12px;
+        }
+        
+        .filter-badge i:hover {
+            opacity: 0.8;
+        }
+        
+        .result-info {
+            font-size: 14px;
+            color: #6c757d;
+            font-weight: 500;
+        }
+        
+        /* Pagination */
+        .pagination-controls {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: 20px;
+            padding: 15px 0;
+            border-top: 1px solid #dee2e6;
+        }
+        
+        .pagination-info {
+            font-size: 14px;
+            color: #6c757d;
+        }
+        
+        .pagination-buttons {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+        
+        .pagination-buttons button {
+            min-width: 36px;
+            height: 36px;
+            padding: 6px 12px;
+        }
+        
+        .pagination-buttons button.active {
+            background: #0d6efd;
+            color: white;
+            border-color: #0d6efd;
+        }
+        
+        .per-page-selector {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+        
+        .per-page-selector select {
+            width: auto;
+            padding: 6px 12px;
+        }
+
         /* Mobile Product Cards Container */
         #mobileProductCards {
             display: none;
@@ -37,8 +148,13 @@
                 display: none;
             }
             
-            /* Hide search input on mobile (use search overlay instead) */
-            #productsView .row.mb-3 {
+            /* Hide desktop filters on mobile */
+            .product-filters {
+                display: none;
+            }
+            
+            /* Hide pagination on mobile */
+            .pagination-controls {
                 display: none;
             }
         }
@@ -222,15 +338,70 @@
             <!-- Mobile Product Cards -->
             <div id="mobileProductCards"></div>
             
-            <!-- Desktop Table -->
+            <!-- Desktop Filters & Table -->
+            <div class="product-filters">
+                <div class="filter-row">
+                    <div class="filter-group" style="flex: 2;">
+                        <label for="productSearchInput">Search</label>
+                        <input type="text" class="form-control" id="productSearchInput" placeholder="Search by name, SKU, department, or supplier..." onkeyup="applyProductFilters()">
+                    </div>
+                    <div class="filter-group">
+                        <label for="departmentFilter">Department</label>
+                        <select class="form-select" id="departmentFilter" onchange="applyProductFilters()">
+                            <option value="">All Departments</option>
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <label for="supplierFilter">Supplier</label>
+                        <select class="form-select" id="supplierFilter" onchange="applyProductFilters()">
+                            <option value="">All Suppliers</option>
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <label for="expiryFilter">Expiry Status</label>
+                        <select class="form-select" id="expiryFilter" onchange="applyProductFilters()">
+                            <option value="">All Products</option>
+                            <option value="expiring_soon">Expiring Soon (7 days)</option>
+                            <option value="expiring_month">Expiring This Month</option>
+                            <option value="no_expiry">No Expiry Date</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="filter-row">
+                    <div class="filter-group">
+                        <label for="sortByFilter">Sort By</label>
+                        <select class="form-select" id="sortByFilter" onchange="applyProductFilters()">
+                            <option value="name">Name</option>
+                            <option value="sku">SKU</option>
+                            <option value="department">Department</option>
+                            <option value="supplier">Supplier</option>
+                            <option value="price">Price</option>
+                            <option value="stock">Stock Quantity</option>
+                            <option value="expiry">Next Expiry</option>
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <label for="sortOrderFilter">Order</label>
+                        <select class="form-select" id="sortOrderFilter" onchange="applyProductFilters()">
+                            <option value="asc">Ascending (A-Z, Low-High)</option>
+                            <option value="desc">Descending (Z-A, High-Low)</option>
+                        </select>
+                    </div>
+                    <div class="filter-group" style="flex: 2;">
+                        <label>&nbsp;</label>
+                        <button class="btn btn-outline-secondary w-100" onclick="clearAllFilters()"><i class="bi bi-x-circle"></i> Clear All Filters</button>
+                    </div>
+                </div>
+                <div class="filter-row" style="justify-content: space-between; align-items: center; margin-top: 12px; border-top: 1px solid #dee2e6; padding-top: 12px;">
+                    <div class="active-filters">
+                        <span class="result-info" id="resultInfo">Loading...</span>
+                        <div id="activeFilterBadges"></div>
+                    </div>
+                </div>
+            </div>
+            
             <div class="card">
                 <div class="card-body">
-                    <div class="row mb-3">
-                        <div class="col-md-6">
-                            <label for="productSearch" class="visually-hidden">Search products</label>
-                            <input type="text" class="form-control" id="productSearch" placeholder="Search products..." onkeyup="searchProducts()" aria-label="Search products">
-                        </div>
-                    </div>
                     <div class="table-responsive">
                         <table class="table table-hover" role="table">
                             <thead>
@@ -238,6 +409,22 @@
                             </thead>
                             <tbody id="productsTable"><tr><td colspan="7" class="text-center">Loading...</td></tr></tbody>
                         </table>
+                    </div>
+                    
+                    <!-- Pagination Controls -->
+                    <div class="pagination-controls">
+                        <div class="pagination-info" id="paginationInfo">Showing 0-0 of 0 products</div>
+                        <div class="pagination-buttons" id="paginationButtons"></div>
+                        <div class="per-page-selector">
+                            <label for="perPageSelect" style="margin: 0; font-size: 14px; color: #6c757d;">Per page:</label>
+                            <select class="form-select form-select-sm" id="perPageSelect" onchange="changePerPage()">
+                                <option value="25">25</option>
+                                <option value="50" selected>50</option>
+                                <option value="100">100</option>
+                                <option value="200">200</option>
+                                <option value="all">All</option>
+                            </select>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -418,6 +605,6 @@
     <!-- Barcode Scanner -->
     <script src="/js/barcode-scanner.js?v=2"></script>
     <!-- Core Application -->
-    <script src="/js/app.js?v=5"></script>
+    <script src="/js/app.js?v=6"></script>
 </body>
 </html>

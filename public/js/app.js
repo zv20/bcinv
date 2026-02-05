@@ -4,6 +4,12 @@ const API_URL = '/api';
 let allStockData = [];
 // Store current product being viewed in details
 let currentProduct = null;
+// Store all products for filtering
+let allProducts = [];
+let filteredProducts = [];
+// Pagination state
+let currentPage = 1;
+let perPage = 50;
 
 document.addEventListener('DOMContentLoaded', () => { showDashboard(); });
 
@@ -255,16 +261,242 @@ async function loadDashboard() {
 
 async function loadProducts() {
     try {
-        const response = await fetch(`${API_URL}/products?limit=100`);
+        const response = await fetch(`${API_URL}/products?limit=10000`);
         const data = await response.json();
+        allProducts = data.products || [];
         
-        // Render desktop table
-        document.getElementById('productsTable').innerHTML = data.products.length === 0 ? '<tr><td colspan="7" class="text-center">No products found</td></tr>' :
-            data.products.map(p => `<tr><td>${p.name}</td><td>${p.sku || '-'}</td><td>${p.department_name || '-'}</td><td>${p.supplier_name || '-'}</td><td>${p.unit || '-'}</td><td>$${parseFloat(p.cost_price || 0).toFixed(2)}</td><td><button class="btn btn-sm btn-info btn-icon" onclick="showProductDetails(${p.id})" title="View Details"><i class="bi bi-eye"></i></button> <button class="btn btn-sm btn-primary btn-icon" onclick='editProduct(${JSON.stringify(p).replace(/'/g, "&apos;")})'><i class="bi bi-pencil"></i></button> <button class="btn btn-sm btn-danger btn-icon" onclick="deleteProduct(${p.id}, '${p.name.replace(/'/g, "\\'")}')" ><i class="bi bi-trash"></i></button></td></tr>`).join('');
+        // Load filter dropdowns
+        await loadFilterDropdowns();
+        
+        // Apply filters (will render table)
+        applyProductFilters();
         
         // Render mobile cards
-        renderMobileProductCards(data.products);
+        renderMobileProductCards(allProducts);
     } catch (error) { console.error('Products error:', error); }
+}
+
+// Load department and supplier dropdowns
+async function loadFilterDropdowns() {
+    try {
+        const [depts, suppliers] = await Promise.all([
+            fetch(`${API_URL}/departments`).then(r => r.json()),
+            fetch(`${API_URL}/suppliers`).then(r => r.json())
+        ]);
+        
+        // Populate department filter
+        document.getElementById('departmentFilter').innerHTML = '<option value="">All Departments</option>' + 
+            depts.map(d => `<option value="${d.id}">${d.name}</option>`).join('');
+        
+        // Populate supplier filter
+        document.getElementById('supplierFilter').innerHTML = '<option value="">All Suppliers</option>' + 
+            suppliers.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
+    } catch (error) {
+        console.error('Error loading filter dropdowns:', error);
+    }
+}
+
+// Apply all product filters
+function applyProductFilters() {
+    const searchText = document.getElementById('productSearchInput').value.toLowerCase();
+    const departmentId = document.getElementById('departmentFilter').value;
+    const supplierId = document.getElementById('supplierFilter').value;
+    const expiryFilter = document.getElementById('expiryFilter').value;
+    const sortBy = document.getElementById('sortByFilter').value;
+    const sortOrder = document.getElementById('sortOrderFilter').value;
+    
+    // Filter products
+    filteredProducts = allProducts.filter(p => {
+        // Search filter
+        if (searchText) {
+            const matchName = p.name.toLowerCase().includes(searchText);
+            const matchSku = (p.sku || '').toLowerCase().includes(searchText);
+            const matchDept = (p.department_name || '').toLowerCase().includes(searchText);
+            const matchSupplier = (p.supplier_name || '').toLowerCase().includes(searchText);
+            if (!matchName && !matchSku && !matchDept && !matchSupplier) return false;
+        }
+        
+        // Department filter
+        if (departmentId && p.department_id != departmentId) return false;
+        
+        // Supplier filter
+        if (supplierId && p.supplier_id != supplierId) return false;
+        
+        // Expiry filter
+        if (expiryFilter) {
+            if (expiryFilter === 'no_expiry' && p.next_expiry_date) return false;
+            if (expiryFilter === 'expiring_soon' && p.next_expiry_date) {
+                const daysLeft = Math.ceil((new Date(p.next_expiry_date) - new Date()) / 86400000);
+                if (daysLeft > 7) return false;
+            }
+            if (expiryFilter === 'expiring_month' && p.next_expiry_date) {
+                const daysLeft = Math.ceil((new Date(p.next_expiry_date) - new Date()) / 86400000);
+                if (daysLeft > 30) return false;
+            }
+        }
+        
+        return true;
+    });
+    
+    // Sort products
+    filteredProducts.sort((a, b) => {
+        let valA, valB;
+        
+        switch(sortBy) {
+            case 'name':
+                valA = (a.name || '').toLowerCase();
+                valB = (b.name || '').toLowerCase();
+                break;
+            case 'sku':
+                valA = (a.sku || '').toLowerCase();
+                valB = (b.sku || '').toLowerCase();
+                break;
+            case 'department':
+                valA = (a.department_name || '').toLowerCase();
+                valB = (b.department_name || '').toLowerCase();
+                break;
+            case 'supplier':
+                valA = (a.supplier_name || '').toLowerCase();
+                valB = (b.supplier_name || '').toLowerCase();
+                break;
+            case 'price':
+                valA = parseFloat(a.cost_price || 0);
+                valB = parseFloat(b.cost_price || 0);
+                break;
+            case 'stock':
+                valA = parseFloat(a.total_quantity || 0);
+                valB = parseFloat(b.total_quantity || 0);
+                break;
+            case 'expiry':
+                valA = a.next_expiry_date ? new Date(a.next_expiry_date).getTime() : Infinity;
+                valB = b.next_expiry_date ? new Date(b.next_expiry_date).getTime() : Infinity;
+                break;
+            default:
+                return 0;
+        }
+        
+        if (valA < valB) return sortOrder === 'asc' ? -1 : 1;
+        if (valA > valB) return sortOrder === 'asc' ? 1 : -1;
+        return 0;
+    });
+    
+    // Reset to page 1
+    currentPage = 1;
+    
+    // Render results
+    renderProductsTable();
+    updateActiveFilterBadges();
+}
+
+// Render products table with pagination
+function renderProductsTable() {
+    const start = (currentPage - 1) * perPage;
+    const end = perPage === 'all' ? filteredProducts.length : start + parseInt(perPage);
+    const pageProducts = perPage === 'all' ? filteredProducts : filteredProducts.slice(start, end);
+    
+    // Render table
+    document.getElementById('productsTable').innerHTML = pageProducts.length === 0 ? '<tr><td colspan="7" class="text-center">No products found</td></tr>' :
+        pageProducts.map(p => `<tr><td>${p.name}</td><td>${p.sku || '-'}</td><td>${p.department_name || '-'}</td><td>${p.supplier_name || '-'}</td><td>${p.unit || '-'}</td><td>$${parseFloat(p.cost_price || 0).toFixed(2)}</td><td><button class="btn btn-sm btn-info btn-icon" onclick="showProductDetails(${p.id})" title="View Details"><i class="bi bi-eye"></i></button> <button class="btn btn-sm btn-primary btn-icon" onclick='editProduct(${JSON.stringify(p).replace(/'/g, "&apos;")})'><i class="bi bi-pencil"></i></button> <button class="btn btn-sm btn-danger btn-icon" onclick="deleteProduct(${p.id}, '${p.name.replace(/'/g, "\\'")}')" ><i class="bi bi-trash"></i></button></td></tr>`).join('');
+    
+    // Update pagination info
+    const actualStart = pageProducts.length === 0 ? 0 : start + 1;
+    const actualEnd = Math.min(end, filteredProducts.length);
+    document.getElementById('paginationInfo').textContent = `Showing ${actualStart}-${actualEnd} of ${filteredProducts.length} products`;
+    document.getElementById('resultInfo').textContent = `${filteredProducts.length} of ${allProducts.length} products`;
+    
+    // Render pagination buttons
+    renderPaginationButtons();
+}
+
+// Render pagination buttons
+function renderPaginationButtons() {
+    if (perPage === 'all') {
+        document.getElementById('paginationButtons').innerHTML = '';
+        return;
+    }
+    
+    const totalPages = Math.ceil(filteredProducts.length / parseInt(perPage));
+    let html = '';
+    
+    // Previous button
+    html += `<button class="btn btn-sm btn-outline-primary" onclick="changePage(${currentPage - 1})" ${currentPage === 1 ? 'disabled' : ''}><i class="bi bi-chevron-left"></i></button>`;
+    
+    // Page numbers (show max 5 pages)
+    const startPage = Math.max(1, currentPage - 2);
+    const endPage = Math.min(totalPages, startPage + 4);
+    
+    if (startPage > 1) {
+        html += `<button class="btn btn-sm btn-outline-primary" onclick="changePage(1)">1</button>`;
+        if (startPage > 2) html += `<span style="padding: 0 8px;">...</span>`;
+    }
+    
+    for (let i = startPage; i <= endPage; i++) {
+        html += `<button class="btn btn-sm ${i === currentPage ? 'btn-primary active' : 'btn-outline-primary'}" onclick="changePage(${i})">${i}</button>`;
+    }
+    
+    if (endPage < totalPages) {
+        if (endPage < totalPages - 1) html += `<span style="padding: 0 8px;">...</span>`;
+        html += `<button class="btn btn-sm btn-outline-primary" onclick="changePage(${totalPages})">${totalPages}</button>`;
+    }
+    
+    // Next button
+    html += `<button class="btn btn-sm btn-outline-primary" onclick="changePage(${currentPage + 1})" ${currentPage === totalPages ? 'disabled' : ''}><i class="bi bi-chevron-right"></i></button>`;
+    
+    document.getElementById('paginationButtons').innerHTML = html;
+}
+
+// Change page
+function changePage(page) {
+    const totalPages = Math.ceil(filteredProducts.length / parseInt(perPage));
+    if (page < 1 || page > totalPages) return;
+    currentPage = page;
+    renderProductsTable();
+}
+
+// Change per page
+function changePerPage() {
+    perPage = document.getElementById('perPageSelect').value;
+    currentPage = 1;
+    renderProductsTable();
+}
+
+// Update active filter badges
+function updateActiveFilterBadges() {
+    const badges = [];
+    
+    const searchText = document.getElementById('productSearchInput').value;
+    const departmentId = document.getElementById('departmentFilter').value;
+    const supplierId = document.getElementById('supplierFilter').value;
+    const expiryFilter = document.getElementById('expiryFilter').value;
+    
+    if (searchText) badges.push(`Search: "${searchText}"`);
+    if (departmentId) {
+        const deptName = document.querySelector(`#departmentFilter option[value="${departmentId}"]`).textContent;
+        badges.push(`Department: ${deptName}`);
+    }
+    if (supplierId) {
+        const supplierName = document.querySelector(`#supplierFilter option[value="${supplierId}"]`).textContent;
+        badges.push(`Supplier: ${supplierName}`);
+    }
+    if (expiryFilter) {
+        const expiryName = document.querySelector(`#expiryFilter option[value="${expiryFilter}"]`).textContent;
+        badges.push(`Expiry: ${expiryName}`);
+    }
+    
+    document.getElementById('activeFilterBadges').innerHTML = badges.map(b => 
+        `<span class="filter-badge">${b} <i class="bi bi-x-circle" onclick="clearAllFilters()"></i></span>`
+    ).join('');
+}
+
+// Clear all filters
+function clearAllFilters() {
+    document.getElementById('productSearchInput').value = '';
+    document.getElementById('departmentFilter').value = '';
+    document.getElementById('supplierFilter').value = '';
+    document.getElementById('expiryFilter').value = '';
+    document.getElementById('sortByFilter').value = 'name';
+    document.getElementById('sortOrderFilter').value = 'asc';
+    applyProductFilters();
 }
 
 // Render mobile product cards
@@ -324,21 +556,6 @@ function renderMobileProductCards(products) {
             </div>
         `;
     }).join('');
-}
-
-async function searchProducts() {
-    const search = document.getElementById('productSearch').value;
-    try {
-        const response = await fetch(`${API_URL}/products?search=${encodeURIComponent(search)}&limit=100`);
-        const data = await response.json();
-        
-        // Render desktop table
-        document.getElementById('productsTable').innerHTML = data.products.length === 0 ? '<tr><td colspan="7" class="text-center">No products found</td></tr>' :
-            data.products.map(p => `<tr><td>${p.name}</td><td>${p.sku || '-'}</td><td>${p.department_name || '-'}</td><td>${p.supplier_name || '-'}</td><td>${p.unit || '-'}</td><td>$${parseFloat(p.cost_price || 0).toFixed(2)}</td><td><button class="btn btn-sm btn-info btn-icon" onclick="showProductDetails(${p.id})" title="View Details"><i class="bi bi-eye"></i></button> <button class="btn btn-sm btn-primary btn-icon" onclick='editProduct(${JSON.stringify(p).replace(/'/g, "&apos;")})'><i class="bi bi-pencil"></i></button> <button class="btn btn-sm btn-danger btn-icon" onclick="deleteProduct(${p.id}, '${p.name.replace(/'/g, "\\'")}')" ><i class="bi bi-trash"></i></button></td></tr>`).join('');
-        
-        // Render mobile cards
-        renderMobileProductCards(data.products);
-    } catch (error) { console.error('Search error:', error); }
 }
 
 async function showAddProductModal() {
