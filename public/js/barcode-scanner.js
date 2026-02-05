@@ -114,6 +114,22 @@ class BarcodeScanner {
         </div>
       </div>
 
+      <!-- Button Selection Modal -->
+      <div class="scanner-modal-overlay" id="scanner-button-modal">
+        <div class="scanner-modal">
+          <div class="scanner-modal-header">
+            <h3 id="scanner-button-title">Select Option</h3>
+          </div>
+          <div class="scanner-modal-body">
+            <p id="scanner-button-message"></p>
+            <div id="scanner-button-options" class="button-options"></div>
+          </div>
+          <div class="scanner-modal-footer">
+            <button class="btn btn-secondary" id="scanner-button-cancel">Cancel</button>
+          </div>
+        </div>
+      </div>
+
       <!-- Custom Confirm Modal -->
       <div class="scanner-modal-overlay" id="scanner-confirm-modal">
         <div class="scanner-modal">
@@ -214,6 +230,60 @@ class BarcodeScanner {
       .scanner-modal-body input[type="date"] {
         min-height: 44px;
         cursor: pointer;
+      }
+
+      .button-options {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
+
+      .button-option {
+        width: 100%;
+        padding: 16px;
+        background: #f3f4f6;
+        border: 2px solid #e5e7eb;
+        border-radius: 8px;
+        font-size: 16px;
+        font-weight: 500;
+        color: #111827;
+        cursor: pointer;
+        transition: all 0.2s;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+      }
+
+      .button-option:hover {
+        background: #e5e7eb;
+        border-color: #2563eb;
+      }
+
+      .button-option:active {
+        transform: scale(0.98);
+      }
+
+      .button-option.danger {
+        background: #fee2e2;
+        border-color: #fecaca;
+        color: #991b1b;
+      }
+
+      .button-option.danger:hover {
+        background: #fecaca;
+        border-color: #dc2626;
+      }
+
+      .button-option.warning {
+        background: #fed7aa;
+        border-color: #fdba74;
+        color: #9a3412;
+      }
+
+      .button-option.warning:hover {
+        background: #fdba74;
+        border-color: #ea580c;
       }
 
       .scanner-modal-footer {
@@ -356,6 +426,50 @@ class BarcodeScanner {
       submitBtn.addEventListener('click', handleSubmit);
       cancelBtn.addEventListener('click', handleCancel);
       input.addEventListener('keypress', handleKeyPress);
+    });
+  }
+
+  showButtonModal(title, message, buttons) {
+    return new Promise((resolve) => {
+      const modal = document.getElementById('scanner-button-modal');
+      const titleEl = document.getElementById('scanner-button-title');
+      const messageEl = document.getElementById('scanner-button-message');
+      const optionsContainer = document.getElementById('scanner-button-options');
+      const cancelBtn = document.getElementById('scanner-button-cancel');
+
+      titleEl.textContent = title;
+      messageEl.textContent = message;
+      
+      // Clear previous buttons
+      optionsContainer.innerHTML = '';
+      
+      // Create button elements
+      buttons.forEach(button => {
+        const btnEl = document.createElement('button');
+        btnEl.className = `button-option ${button.style || ''}`;
+        btnEl.innerHTML = `${button.icon || ''} ${button.label}`;
+        btnEl.addEventListener('click', () => {
+          modal.classList.remove('active');
+          cleanup();
+          resolve(button.value);
+        });
+        optionsContainer.appendChild(btnEl);
+      });
+      
+      modal.classList.add('active');
+
+      const handleCancel = () => {
+        modal.classList.remove('active');
+        cleanup();
+        resolve(null);
+      };
+
+      const cleanup = () => {
+        cancelBtn.removeEventListener('click', handleCancel);
+        optionsContainer.innerHTML = '';
+      };
+
+      cancelBtn.addEventListener('click', handleCancel);
     });
   }
 
@@ -804,32 +918,27 @@ class BarcodeScanner {
         return;
       }
       
+      // Fixed date normalization - use the input value directly
+      const targetDate = expiryDateInput;
+      console.log('Target date:', targetDate);
+      
       const normalizeDate = (val) => {
         if (!val) return null;
-        // Convert to Date object first for consistent handling
-        let date;
-        if (val instanceof Date) {
-          date = val;
-        } else {
-          date = new Date(val);
+        // If already in YYYY-MM-DD format, return as-is
+        if (typeof val === 'string' && val.match(/^\d{4}-\d{2}-\d{2}$/)) {
+          return val;
         }
-        
-        // Check if valid date
+        // Otherwise parse and format
+        const date = new Date(val);
         if (isNaN(date.getTime())) {
           console.error('Invalid date:', val);
           return null;
         }
-        
-        // Format as YYYY-MM-DD
         const year = date.getFullYear();
         const month = String(date.getMonth() + 1).padStart(2, '0');
         const day = String(date.getDate()).padStart(2, '0');
-        
         return `${year}-${month}-${day}`;
       };
-      
-      const targetDate = normalizeDate(expiryDateInput.trim());
-      console.log('Target date:', targetDate);
       
       // Check if batch with this date exists (compare only date part)
       const matchingBatch = batches.find(b => {
@@ -938,11 +1047,14 @@ class BarcodeScanner {
         return;
       }
 
-      // Ask if expired or damaged using custom modal
-      const reason = await this.showInputModal(
+      // Ask if expired or damaged using BUTTON SELECTOR
+      const reason = await this.showButtonModal(
         'Discard Reason',
-        `Product: ${product.name}\n\nReason for discard:\n1 = Expired\n2 = Damaged`,
-        '1 or 2'
+        `Product: ${product.name}\n\nWhy are you discarding this item?`,
+        [
+          { label: '📅 Expired', value: '1', style: 'danger' },
+          { label: '⚠️ Damaged', value: '2', style: 'warning' }
+        ]
       );
       
       if (!reason) {
@@ -963,29 +1075,27 @@ class BarcodeScanner {
         return;
       }
       
+      // Fixed date normalization - use the input value directly
+      const targetDate = expiryDateInput;
+      console.log('Target date:', targetDate);
+      
       const normalizeDate = (val) => {
         if (!val) return null;
-        let date;
-        if (val instanceof Date) {
-          date = val;
-        } else {
-          date = new Date(val);
+        // If already in YYYY-MM-DD format, return as-is
+        if (typeof val === 'string' && val.match(/^\d{4}-\d{2}-\d{2}$/)) {
+          return val;
         }
-        
+        // Otherwise parse and format
+        const date = new Date(val);
         if (isNaN(date.getTime())) {
           console.error('Invalid date:', val);
           return null;
         }
-        
         const year = date.getFullYear();
         const month = String(date.getMonth() + 1).padStart(2, '0');
         const day = String(date.getDate()).padStart(2, '0');
-        
         return `${year}-${month}-${day}`;
       };
-      
-      const targetDate = normalizeDate(expiryDateInput.trim());
-      console.log('Target date:', targetDate);
       
       // Get existing batches
       const batchResponse = await fetch(`/api/products/${product.id}/batches`);
