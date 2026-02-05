@@ -1,15 +1,26 @@
 const API_URL = '/api';
 
-// Global stock data for filtering
+// Global data storage
 let allStockData = [];
-// Store current product being viewed in details
 let currentProduct = null;
-// Store all products for filtering
 let allProducts = [];
 let filteredProducts = [];
-// Pagination state
 let currentPage = 1;
 let perPage = 50;
+
+// Expiring items data
+let allExpiringItems = [];
+let filteredExpiringItems = [];
+let expiringDaysFilter = 7;
+let expiringSortColumn = 'days';
+let expiringSortOrder = 'asc';
+
+// Activity log data
+let allActivityLogs = [];
+let filteredActivityLogs = [];
+let activityCurrentPage = 1;
+let activityPerPage = 50;
+let activityTypeFilter = '';
 
 document.addEventListener('DOMContentLoaded', () => { showDashboard(); });
 
@@ -18,21 +29,309 @@ function hideAllViews() {
     document.querySelectorAll('.nav-link, .dropdown-item').forEach(l => l.classList.remove('active'));
 }
 
-// Helper to clear performance cache before refreshing data
 function clearCache() {
     if (window.performanceOptimizer) {
         window.performanceOptimizer.clearCache();
     }
 }
 
+// Navigation functions
 function showDashboard() { hideAllViews(); document.getElementById('dashboardView').style.display = 'block'; document.querySelector('a[onclick*="showDashboard"]').classList.add('active'); loadDashboard(); }
 function showProducts() { hideAllViews(); document.getElementById('productsView').style.display = 'block'; document.querySelector('a[onclick*="showProducts"]').classList.add('active'); loadProducts(); }
-function showStock() { hideAllViews(); document.getElementById('stockView').style.display = 'block'; document.querySelector('a[onclick*="showStock"]').classList.add('active'); loadStock(); }
+function showExpiring() { hideAllViews(); document.getElementById('expiringView').style.display = 'block'; document.querySelector('a[onclick*="showExpiring"]').classList.add('active'); loadExpiring(); }
+function showActivityLog() { hideAllViews(); document.getElementById('activityLogView').style.display = 'block'; loadActivityLog(); }
 function showDepartments() { hideAllViews(); document.getElementById('departmentsView').style.display = 'block'; loadDepartments(); }
 function showSuppliers() { hideAllViews(); document.getElementById('suppliersView').style.display = 'block'; loadSuppliers(); }
 function showLocations() { hideAllViews(); document.getElementById('locationsView').style.display = 'block'; loadLocations(); }
 
-// Filter stock by product name (called from barcode scanner)
+// === EXPIRING SOON PAGE ===
+
+async function loadExpiring() {
+    try {
+        const response = await fetch(`${API_URL}/stock?status=active`);
+        const stock = await response.json();
+        
+        // Filter items with expiry dates and calculate days left
+        allExpiringItems = stock
+            .filter(s => s.expiry_date)
+            .map(s => {
+                const daysLeft = Math.ceil((new Date(s.expiry_date) - new Date()) / 86400000);
+                return { ...s, days_until_expiry: daysLeft };
+            })
+            .filter(s => s.days_until_expiry <= 365); // Show all within a year
+        
+        // Apply initial filter (7 days)
+        filterExpiringDays(7);
+    } catch (error) {
+        console.error('Expiring items fetch error:', error);
+        document.getElementById('expiringTable').innerHTML = '<tr><td colspan="6" class="text-center text-danger">Failed to load expiring items</td></tr>';
+    }
+}
+
+function filterExpiringDays(days) {
+    expiringDaysFilter = days;
+    
+    // Update button states
+    ['expiring7', 'expiring14', 'expiring30', 'expiringAll'].forEach(id => {
+        document.getElementById(id).classList.remove('btn-primary');
+        document.getElementById(id).classList.add('btn-outline-primary');
+    });
+    
+    const btnId = days === 365 ? 'expiringAll' : `expiring${days}`;
+    document.getElementById(btnId).classList.remove('btn-outline-primary');
+    document.getElementById(btnId).classList.add('btn-primary');
+    
+    // Filter items
+    filteredExpiringItems = allExpiringItems.filter(item => item.days_until_expiry <= days);
+    
+    // Apply search if any
+    filterExpiringTable();
+}
+
+function filterExpiringTable() {
+    const searchText = document.getElementById('expiringSearch').value.toLowerCase();
+    
+    let items = allExpiringItems.filter(item => item.days_until_expiry <= expiringDaysFilter);
+    
+    if (searchText) {
+        items = items.filter(item => 
+            item.product_name.toLowerCase().includes(searchText) ||
+            (item.location_name && item.location_name.toLowerCase().includes(searchText))
+        );
+    }
+    
+    filteredExpiringItems = items;
+    sortExpiringTable(expiringSortColumn, true);
+}
+
+function sortExpiringTable(column, keepOrder = false) {
+    if (!keepOrder) {
+        if (expiringSortColumn === column) {
+            expiringSortOrder = expiringSortOrder === 'asc' ? 'desc' : 'asc';
+        } else {
+            expiringSortColumn = column;
+            expiringSortOrder = 'asc';
+        }
+    }
+    
+    filteredExpiringItems.sort((a, b) => {
+        let valA, valB;
+        
+        switch(column) {
+            case 'product':
+                valA = a.product_name.toLowerCase();
+                valB = b.product_name.toLowerCase();
+                break;
+            case 'location':
+                valA = (a.location_name || '').toLowerCase();
+                valB = (b.location_name || '').toLowerCase();
+                break;
+            case 'quantity':
+                valA = parseFloat(a.quantity);
+                valB = parseFloat(b.quantity);
+                break;
+            case 'expiry':
+                valA = new Date(a.expiry_date).getTime();
+                valB = new Date(b.expiry_date).getTime();
+                break;
+            case 'days':
+                valA = a.days_until_expiry;
+                valB = b.days_until_expiry;
+                break;
+            default:
+                return 0;
+        }
+        
+        if (valA < valB) return expiringSortOrder === 'asc' ? -1 : 1;
+        if (valA > valB) return expiringSortOrder === 'asc' ? 1 : -1;
+        return 0;
+    });
+    
+    renderExpiringTable();
+}
+
+function renderExpiringTable() {
+    const table = document.getElementById('expiringTable');
+    
+    if (filteredExpiringItems.length === 0) {
+        table.innerHTML = '<tr><td colspan="6" class="text-center">No expiring items found</td></tr>';
+        return;
+    }
+    
+    table.innerHTML = filteredExpiringItems.map(item => {
+        const daysClass = item.days_until_expiry <= 3 ? 'text-danger fw-bold' : 
+                         item.days_until_expiry <= 7 ? 'text-danger' : 
+                         item.days_until_expiry <= 14 ? 'text-warning' : '';
+        
+        return `<tr>
+            <td>${item.product_name}</td>
+            <td>${item.location_name || 'No location'}</td>
+            <td>${parseFloat(item.quantity).toFixed(2)}</td>
+            <td class="${daysClass}">${new Date(item.expiry_date).toLocaleDateString()}</td>
+            <td class="${daysClass}">${item.days_until_expiry} days</td>
+            <td>
+                <button class="btn btn-sm btn-warning btn-icon" onclick="adjustStock(${item.id}, '${item.product_name.replace(/'/g, "\\'")}'Edits, ${item.quantity})" title="Adjust Stock">
+                    <i class="bi bi-pencil"></i>
+                </button>
+                <button class="btn btn-sm btn-danger btn-icon" onclick="discardStock(${item.id}, '${item.product_name.replace(/'/g, "\\'")}'Edits, ${item.quantity})" title="Discard">
+                    <i class="bi bi-trash"></i>
+                </button>
+            </td>
+        </tr>`;
+    }).join('');
+}
+
+// === ACTIVITY LOG PAGE ===
+
+async function loadActivityLog() {
+    try {
+        const response = await fetch(`${API_URL}/audit?limit=1000`);
+        allActivityLogs = await response.json();
+        filteredActivityLogs = allActivityLogs;
+        activityCurrentPage = 1;
+        
+        // Set default filter button
+        document.getElementById('activityAll').classList.add('btn-primary');
+        document.getElementById('activityAll').classList.remove('btn-outline-primary');
+        
+        filterActivityTable();
+    } catch (error) {
+        console.error('Activity log fetch error:', error);
+        document.getElementById('activityTable').innerHTML = '<tr><td colspan="5" class="text-center text-danger">Failed to load activity log</td></tr>';
+    }
+}
+
+function filterActivityType(type) {
+    activityTypeFilter = type;
+    
+    // Update button states
+    ['activityAll', 'activityAdded', 'activityAdjusted', 'activityDiscarded'].forEach(id => {
+        const btn = document.getElementById(id);
+        btn.classList.remove('btn-primary');
+        btn.classList.add('btn-outline-primary');
+    });
+    
+    const btnMap = {
+        '': 'activityAll',
+        'stock_added': 'activityAdded',
+        'stock_adjusted': 'activityAdjusted',
+        'stock_discarded': 'activityDiscarded'
+    };
+    
+    const btnId = btnMap[type] || 'activityAll';
+    document.getElementById(btnId).classList.remove('btn-outline-primary');
+    document.getElementById(btnId).classList.add('btn-primary');
+    
+    activityCurrentPage = 1;
+    filterActivityTable();
+}
+
+function filterActivityTable() {
+    const searchText = document.getElementById('activitySearch').value.toLowerCase();
+    
+    filteredActivityLogs = allActivityLogs.filter(log => {
+        // Type filter
+        if (activityTypeFilter && log.action !== activityTypeFilter) return false;
+        
+        // Search filter
+        if (searchText && !log.product_name.toLowerCase().includes(searchText)) return false;
+        
+        return true;
+    });
+    
+    renderActivityTable();
+}
+
+function renderActivityTable() {
+    const start = (activityCurrentPage - 1) * activityPerPage;
+    const end = start + parseInt(activityPerPage);
+    const pageLogs = filteredActivityLogs.slice(start, end);
+    
+    const table = document.getElementById('activityTable');
+    
+    if (pageLogs.length === 0) {
+        table.innerHTML = '<tr><td colspan="5" class="text-center">No activity found</td></tr>';
+    } else {
+        table.innerHTML = pageLogs.map(log => {
+            const actionBadge = {
+                'stock_added': '<span class="badge bg-success">Added</span>',
+                'add_stock': '<span class="badge bg-success">Added</span>',
+                'stock_adjusted': '<span class="badge bg-warning">Adjusted</span>',
+                'adjust_stock': '<span class="badge bg-warning">Adjusted</span>',
+                'stock_discarded': '<span class="badge bg-danger">Discarded</span>',
+                'discard': '<span class="badge bg-danger">Discarded</span>',
+                'add_batch': '<span class="badge bg-success">Batch Added</span>',
+                'discard_batch': '<span class="badge bg-danger">Batch Discarded</span>'
+            };
+            
+            const badge = actionBadge[log.action] || `<span class="badge bg-secondary">${log.action}</span>`;
+            const qtyChange = log.quantity_change > 0 ? `+${log.quantity_change}` : log.quantity_change;
+            const qtyClass = log.quantity_change > 0 ? 'text-success' : 'text-danger';
+            
+            return `<tr>
+                <td><small>${new Date(log.created_at).toLocaleString()}</small></td>
+                <td>${badge}</td>
+                <td>${log.product_name}<br><small class="text-muted">${log.sku || 'No SKU'}</small></td>
+                <td class="${qtyClass} fw-bold">${qtyChange || '-'}</td>
+                <td><small>${log.reason || '-'}<br>${log.notes || ''}</small></td>
+            </tr>`;
+        }).join('');
+    }
+    
+    // Update pagination info
+    const actualStart = pageLogs.length === 0 ? 0 : start + 1;
+    const actualEnd = Math.min(end, filteredActivityLogs.length);
+    document.getElementById('activityPaginationInfo').textContent = `Showing ${actualStart}-${actualEnd} of ${filteredActivityLogs.length} entries`;
+    
+    renderActivityPaginationButtons();
+}
+
+function renderActivityPaginationButtons() {
+    const totalPages = Math.ceil(filteredActivityLogs.length / parseInt(activityPerPage));
+    let html = '';
+    
+    // Previous button
+    html += `<button class="btn btn-sm btn-outline-primary" onclick="changeActivityPage(${activityCurrentPage - 1})" ${activityCurrentPage === 1 ? 'disabled' : ''}><i class="bi bi-chevron-left"></i></button>`;
+    
+    // Page numbers (show max 5 pages)
+    const startPage = Math.max(1, activityCurrentPage - 2);
+    const endPage = Math.min(totalPages, startPage + 4);
+    
+    if (startPage > 1) {
+        html += `<button class="btn btn-sm btn-outline-primary" onclick="changeActivityPage(1)">1</button>`;
+        if (startPage > 2) html += `<span style="padding: 0 8px;">...</span>`;
+    }
+    
+    for (let i = startPage; i <= endPage; i++) {
+        html += `<button class="btn btn-sm ${i === activityCurrentPage ? 'btn-primary active' : 'btn-outline-primary'}" onclick="changeActivityPage(${i})">${i}</button>`;
+    }
+    
+    if (endPage < totalPages) {
+        if (endPage < totalPages - 1) html += `<span style="padding: 0 8px;">...</span>`;
+        html += `<button class="btn btn-sm btn-outline-primary" onclick="changeActivityPage(${totalPages})">${totalPages}</button>`;
+    }
+    
+    // Next button
+    html += `<button class="btn btn-sm btn-outline-primary" onclick="changeActivityPage(${activityCurrentPage + 1})" ${activityCurrentPage === totalPages ? 'disabled' : ''}><i class="bi bi-chevron-right"></i></button>`;
+    
+    document.getElementById('activityPaginationButtons').innerHTML = html;
+}
+
+function changeActivityPage(page) {
+    const totalPages = Math.ceil(filteredActivityLogs.length / parseInt(activityPerPage));
+    if (page < 1 || page > totalPages) return;
+    activityCurrentPage = page;
+    renderActivityTable();
+}
+
+function changeActivityPerPage() {
+    activityPerPage = document.getElementById('activityPerPage').value;
+    activityCurrentPage = 1;
+    renderActivityTable();
+}
+
+// === EXISTING FUNCTIONS (keeping all previous code) ===
+
 function filterStockByProduct(productName) {
     if (!allStockData || allStockData.length === 0) {
         console.log('No stock data available for filtering');
@@ -47,7 +346,6 @@ function filterStockByProduct(productName) {
     renderStockTable(filtered);
 }
 
-// Render stock table (extracted from loadStock)
 function renderStockTable(stock) {
     const stockTable = document.getElementById('stockTable');
     if (!stockTable) {
@@ -63,16 +361,13 @@ function renderStockTable(stock) {
         }).join('');
 }
 
-// Show product details with batches
 async function showProductDetails(productId) {
     try {
         console.log('Loading product details for ID:', productId);
         
-        // Fetch all products and find the one we need
         const allProductsResp = await fetch(`${API_URL}/products?limit=1000`);
         const allData = await allProductsResp.json();
         
-        // Handle different response formats
         let products = [];
         if (Array.isArray(allData)) {
             products = allData;
@@ -92,7 +387,6 @@ async function showProductDetails(productId) {
             return;
         }
         
-        // Fill product details
         document.getElementById('detailProductName').textContent = currentProduct.name || 'N/A';
         document.getElementById('detailProductSku').textContent = currentProduct.sku || 'N/A';
         document.getElementById('detailProductDepartment').textContent = currentProduct.department_name || 'N/A';
@@ -100,10 +394,8 @@ async function showProductDetails(productId) {
         document.getElementById('detailProductUnit').textContent = currentProduct.unit || 'N/A';
         document.getElementById('detailProductPrice').textContent = currentProduct.cost_price ? '$' + parseFloat(currentProduct.cost_price).toFixed(2) : 'N/A';
         
-        // Load batches for this product
         await loadProductBatches(productId);
         
-        // Show modal
         new bootstrap.Modal(document.getElementById('productDetailsModal')).show();
     } catch (error) {
         console.error('Error loading product details:', error);
@@ -111,25 +403,21 @@ async function showProductDetails(productId) {
     }
 }
 
-// Load batches for current product
 async function loadProductBatches(productId) {
     try {
         console.log('Loading batches for product ID:', productId);
         
-        // Make sure we have current product info
         if (!currentProduct) {
             console.error('currentProduct is not set');
             document.getElementById('batchesTable').innerHTML = '<tr><td colspan="6" class="text-center text-danger">Error: Product information not available</td></tr>';
             return;
         }
         
-        // Use the correct endpoint that filters by product ID
         const response = await fetch(`${API_URL}/products/${productId}/batches`);
         const batchesData = await response.json();
         
         console.log('Batches data response:', batchesData);
         
-        // Handle different response formats
         let batches = [];
         if (Array.isArray(batchesData)) {
             batches = batchesData;
@@ -141,7 +429,6 @@ async function loadProductBatches(productId) {
         
         console.log('Parsed batches:', batches);
         
-        // Add product name to each batch for safer rendering
         batches = batches.map(b => ({ ...b, _productName: currentProduct.name }));
         
         renderBatchesTable(batches, currentProduct.name);
@@ -151,14 +438,12 @@ async function loadProductBatches(productId) {
     }
 }
 
-// Render batches table with product name parameter for safety
 function renderBatchesTable(batches, productName) {
     if (batches.length === 0) {
         document.getElementById('batchesTable').innerHTML = '<tr><td colspan="6" class="text-center text-muted">No stock batches for this product. Click "Add Batch" to add stock.</td></tr>';
         return;
     }
     
-    // Use passed productName or fall back to currentProduct or batch data
     const safeName = productName || (currentProduct ? currentProduct.name : (batches[0]._productName || 'Product'));
     const escapedName = safeName.replace(/'/g, "\\'");
     
@@ -186,30 +471,24 @@ function renderBatchesTable(batches, productName) {
     }).join('');
 }
 
-// Open add batch modal for current product
 async function showAddBatchModal() {
     if (!currentProduct) {
         alert('No product selected');
         return;
     }
     
-    // Load locations
     const locations = await fetch(`${API_URL}/locations`).then(r => r.json());
     
-    // Pre-fill product selection
     document.getElementById('stockProductSelect').innerHTML = `<option value="${currentProduct.id}" selected>${currentProduct.name} (${currentProduct.sku || 'No Barcode'})</option>`;
     document.getElementById('stockLocationSelect').innerHTML = '<option value="">No location</option>' + locations.map(l => `<option value="${l.id}">${l.name}</option>`).join('');
     document.getElementById('addStockForm').reset();
     document.getElementById('stockProductSelect').value = currentProduct.id;
     
-    // Hide product details modal temporarily
     bootstrap.Modal.getInstance(document.getElementById('productDetailsModal')).hide();
     
-    // Show add stock modal
     const addStockModal = new bootstrap.Modal(document.getElementById('addStockModal'));
     addStockModal.show();
     
-    // When add stock modal closes, reopen product details
     document.getElementById('addStockModal').addEventListener('hidden.bs.modal', function handler() {
         if (currentProduct) {
             setTimeout(() => {
@@ -221,17 +500,14 @@ async function showAddBatchModal() {
     }, { once: true });
 }
 
-// Edit product info from details view
 function editProductFromDetails() {
     if (!currentProduct) {
         alert('No product selected');
         return;
     }
     
-    // Hide product details modal
     bootstrap.Modal.getInstance(document.getElementById('productDetailsModal')).hide();
     
-    // Small delay then open edit modal
     setTimeout(() => {
         editProduct(currentProduct);
     }, 300);
@@ -265,18 +541,14 @@ async function loadProducts() {
         const data = await response.json();
         allProducts = data.products || [];
         
-        // Load filter dropdowns
         await loadFilterDropdowns();
         
-        // Apply filters (will render table)
         applyProductFilters();
         
-        // Render mobile cards
         renderMobileProductCards(allProducts);
     } catch (error) { console.error('Products error:', error); }
 }
 
-// Load department and supplier dropdowns
 async function loadFilterDropdowns() {
     try {
         const [depts, suppliers] = await Promise.all([
@@ -284,11 +556,9 @@ async function loadFilterDropdowns() {
             fetch(`${API_URL}/suppliers`).then(r => r.json())
         ]);
         
-        // Populate department filter
         document.getElementById('departmentFilter').innerHTML = '<option value="">All Departments</option>' + 
             depts.map(d => `<option value="${d.id}">${d.name}</option>`).join('');
         
-        // Populate supplier filter
         document.getElementById('supplierFilter').innerHTML = '<option value="">All Suppliers</option>' + 
             suppliers.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
     } catch (error) {
@@ -296,7 +566,6 @@ async function loadFilterDropdowns() {
     }
 }
 
-// Apply all product filters
 function applyProductFilters() {
     const searchText = document.getElementById('productSearchInput').value.toLowerCase();
     const departmentId = document.getElementById('departmentFilter').value;
@@ -305,9 +574,7 @@ function applyProductFilters() {
     const sortBy = document.getElementById('sortByFilter').value;
     const sortOrder = document.getElementById('sortOrderFilter').value;
     
-    // Filter products
     filteredProducts = allProducts.filter(p => {
-        // Search filter
         if (searchText) {
             const matchName = p.name.toLowerCase().includes(searchText);
             const matchSku = (p.sku || '').toLowerCase().includes(searchText);
@@ -316,13 +583,10 @@ function applyProductFilters() {
             if (!matchName && !matchSku && !matchDept && !matchSupplier) return false;
         }
         
-        // Department filter
         if (departmentId && p.department_id != departmentId) return false;
         
-        // Supplier filter
         if (supplierId && p.supplier_id != supplierId) return false;
         
-        // Expiry filter
         if (expiryFilter) {
             if (expiryFilter === 'no_expiry' && p.next_expiry_date) return false;
             if (expiryFilter === 'expiring_soon' && p.next_expiry_date) {
@@ -338,7 +602,6 @@ function applyProductFilters() {
         return true;
     });
     
-    // Sort products
     filteredProducts.sort((a, b) => {
         let valA, valB;
         
@@ -380,35 +643,28 @@ function applyProductFilters() {
         return 0;
     });
     
-    // Reset to page 1
     currentPage = 1;
     
-    // Render results
     renderProductsTable();
     updateActiveFilterBadges();
 }
 
-// Render products table with pagination
 function renderProductsTable() {
     const start = (currentPage - 1) * perPage;
     const end = perPage === 'all' ? filteredProducts.length : start + parseInt(perPage);
     const pageProducts = perPage === 'all' ? filteredProducts : filteredProducts.slice(start, end);
     
-    // Render table
     document.getElementById('productsTable').innerHTML = pageProducts.length === 0 ? '<tr><td colspan="7" class="text-center">No products found</td></tr>' :
         pageProducts.map(p => `<tr><td>${p.name}</td><td>${p.sku || '-'}</td><td>${p.department_name || '-'}</td><td>${p.supplier_name || '-'}</td><td>${p.unit || '-'}</td><td>$${parseFloat(p.cost_price || 0).toFixed(2)}</td><td><button class="btn btn-sm btn-info btn-icon" onclick="showProductDetails(${p.id})" title="View Details"><i class="bi bi-eye"></i></button> <button class="btn btn-sm btn-primary btn-icon" onclick='editProduct(${JSON.stringify(p).replace(/'/g, "&apos;")})'><i class="bi bi-pencil"></i></button> <button class="btn btn-sm btn-danger btn-icon" onclick="deleteProduct(${p.id}, '${p.name.replace(/'/g, "\\'")}')" ><i class="bi bi-trash"></i></button></td></tr>`).join('');
     
-    // Update pagination info
     const actualStart = pageProducts.length === 0 ? 0 : start + 1;
     const actualEnd = Math.min(end, filteredProducts.length);
     document.getElementById('paginationInfo').textContent = `Showing ${actualStart}-${actualEnd} of ${filteredProducts.length} products`;
     document.getElementById('resultInfo').textContent = `${filteredProducts.length} of ${allProducts.length} products`;
     
-    // Render pagination buttons
     renderPaginationButtons();
 }
 
-// Render pagination buttons
 function renderPaginationButtons() {
     if (perPage === 'all') {
         document.getElementById('paginationButtons').innerHTML = '';
@@ -418,10 +674,8 @@ function renderPaginationButtons() {
     const totalPages = Math.ceil(filteredProducts.length / parseInt(perPage));
     let html = '';
     
-    // Previous button
     html += `<button class="btn btn-sm btn-outline-primary" onclick="changePage(${currentPage - 1})" ${currentPage === 1 ? 'disabled' : ''}><i class="bi bi-chevron-left"></i></button>`;
     
-    // Page numbers (show max 5 pages)
     const startPage = Math.max(1, currentPage - 2);
     const endPage = Math.min(totalPages, startPage + 4);
     
@@ -439,13 +693,11 @@ function renderPaginationButtons() {
         html += `<button class="btn btn-sm btn-outline-primary" onclick="changePage(${totalPages})">${totalPages}</button>`;
     }
     
-    // Next button
     html += `<button class="btn btn-sm btn-outline-primary" onclick="changePage(${currentPage + 1})" ${currentPage === totalPages ? 'disabled' : ''}><i class="bi bi-chevron-right"></i></button>`;
     
     document.getElementById('paginationButtons').innerHTML = html;
 }
 
-// Change page
 function changePage(page) {
     const totalPages = Math.ceil(filteredProducts.length / parseInt(perPage));
     if (page < 1 || page > totalPages) return;
@@ -453,14 +705,12 @@ function changePage(page) {
     renderProductsTable();
 }
 
-// Change per page
 function changePerPage() {
     perPage = document.getElementById('perPageSelect').value;
     currentPage = 1;
     renderProductsTable();
 }
 
-// Update active filter badges
 function updateActiveFilterBadges() {
     const badges = [];
     
@@ -488,7 +738,6 @@ function updateActiveFilterBadges() {
     ).join('');
 }
 
-// Clear all filters
 function clearAllFilters() {
     document.getElementById('productSearchInput').value = '';
     document.getElementById('departmentFilter').value = '';
@@ -499,7 +748,6 @@ function clearAllFilters() {
     applyProductFilters();
 }
 
-// Render mobile product cards
 function renderMobileProductCards(products) {
     const container = document.getElementById('mobileProductCards');
     if (!container) return;
@@ -510,7 +758,6 @@ function renderMobileProductCards(products) {
     }
     
     container.innerHTML = products.map(p => {
-        // Calculate expiry info
         let expiryInfo = '';
         let expiryBadge = '';
         
@@ -589,7 +836,6 @@ async function editProduct(product) {
     document.getElementById('editProductName').value = product.name;
     document.getElementById('editProductSku').value = product.sku || '';
     
-    // Parse unit value - convert text to empty or extract number
     let unitValue = '';
     if (product.unit) {
         const parsed = parseFloat(product.unit);
@@ -613,7 +859,6 @@ async function updateProduct() {
             bootstrap.Modal.getInstance(document.getElementById('editProductModal')).hide();
             clearCache();
             await loadProducts();
-            // If we were in product details, reload it
             if (currentProduct && currentProduct.id == id) {
                 setTimeout(() => showProductDetails(id), 300);
             }
@@ -633,14 +878,6 @@ async function deleteProduct(id, name) {
     } catch (error) { console.error('Delete error:', error); }
 }
 
-async function loadStock() {
-    try {
-        const stock = await fetch(`${API_URL}/stock`).then(r => r.json());
-        allStockData = stock; // Store for filtering
-        renderStockTable(stock);
-    } catch (error) { console.error('Stock error:', error); }
-}
-
 async function showAddStockModal() {
     const [productsData, locations] = await Promise.all([fetch(`${API_URL}/products?limit=1000`).then(r => r.json()), fetch(`${API_URL}/locations`).then(r => r.json())]);
     document.getElementById('stockProductSelect').innerHTML = '<option value="">Select product...</option>' + productsData.products.map(p => `<option value="${p.id}">${p.name} (${p.sku || 'No Barcode'})</option>`).join('');
@@ -657,14 +894,16 @@ async function addStock() {
         if (response.ok) { 
             bootstrap.Modal.getInstance(document.getElementById('addStockModal')).hide();
             clearCache();
-            // Only reload stock view if it exists
             const stockTable = document.getElementById('stockTable');
             if (stockTable) {
                 await loadStock();
             }
-            // If we were viewing product details, reload batches
             if (currentProduct && data.product_id == currentProduct.id) {
                 await loadProductBatches(currentProduct.id);
+            }
+            // Reload expiring view if open
+            if (document.getElementById('expiringView').style.display === 'block') {
+                await loadExpiring();
             }
             alert('Stock added!');
         }
@@ -687,15 +926,18 @@ async function adjustStock(batchId, productName, currentQty) {
         
         clearCache();
         
-        // Only reload stock view if it exists
         const stockTable = document.getElementById('stockTable');
         if (stockTable) {
             await loadStock();
         }
         
-        // If we were viewing product details, reload batches
         if (currentProduct) {
             await loadProductBatches(currentProduct.id);
+        }
+        
+        // Reload expiring view if open
+        if (document.getElementById('expiringView').style.display === 'block') {
+            await loadExpiring();
         }
         
         alert('Adjusted');
@@ -721,15 +963,18 @@ async function discardStock(batchId, productName, quantity) {
         
         clearCache();
         
-        // Only reload stock view if it exists
         const stockTable = document.getElementById('stockTable');
         if (stockTable) {
             await loadStock();
         }
         
-        // If we were viewing product details, reload batches
         if (currentProduct) {
             await loadProductBatches(currentProduct.id);
+        }
+        
+        // Reload expiring view if open
+        if (document.getElementById('expiringView').style.display === 'block') {
+            await loadExpiring();
         }
         
         alert('Discarded');
