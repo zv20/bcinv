@@ -97,6 +97,23 @@ class BarcodeScanner {
         </div>
       </div>
 
+      <!-- Date Picker Modal -->
+      <div class="scanner-modal-overlay" id="scanner-date-modal">
+        <div class="scanner-modal">
+          <div class="scanner-modal-header">
+            <h3 id="scanner-date-title">Select Date</h3>
+          </div>
+          <div class="scanner-modal-body">
+            <p id="scanner-date-message"></p>
+            <input type="date" id="scanner-date-input" class="form-control">
+          </div>
+          <div class="scanner-modal-footer">
+            <button class="btn btn-secondary" id="scanner-date-cancel">Cancel</button>
+            <button class="btn btn-primary" id="scanner-date-submit">OK</button>
+          </div>
+        </div>
+      </div>
+
       <!-- Custom Confirm Modal -->
       <div class="scanner-modal-overlay" id="scanner-confirm-modal">
         <div class="scanner-modal">
@@ -194,6 +211,11 @@ class BarcodeScanner {
         box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
       }
 
+      .scanner-modal-body input[type="date"] {
+        min-height: 44px;
+        cursor: pointer;
+      }
+
       .scanner-modal-footer {
         padding: 16px 20px;
         border-top: 1px solid #e5e7eb;
@@ -248,6 +270,63 @@ class BarcodeScanner {
       input.value = defaultValue;
       modal.classList.add('active');
       
+      setTimeout(() => input.focus(), 100);
+
+      const handleSubmit = () => {
+        const value = input.value.trim();
+        modal.classList.remove('active');
+        cleanup();
+        resolve(value || null);
+      };
+
+      const handleCancel = () => {
+        modal.classList.remove('active');
+        cleanup();
+        resolve(null);
+      };
+
+      const handleKeyPress = (e) => {
+        if (e.key === 'Enter') handleSubmit();
+        if (e.key === 'Escape') handleCancel();
+      };
+
+      const cleanup = () => {
+        submitBtn.removeEventListener('click', handleSubmit);
+        cancelBtn.removeEventListener('click', handleCancel);
+        input.removeEventListener('keypress', handleKeyPress);
+      };
+
+      submitBtn.addEventListener('click', handleSubmit);
+      cancelBtn.addEventListener('click', handleCancel);
+      input.addEventListener('keypress', handleKeyPress);
+    });
+  }
+
+  showDateModal(title, message, defaultDate = '') {
+    return new Promise((resolve) => {
+      const modal = document.getElementById('scanner-date-modal');
+      const titleEl = document.getElementById('scanner-date-title');
+      const messageEl = document.getElementById('scanner-date-message');
+      const input = document.getElementById('scanner-date-input');
+      const submitBtn = document.getElementById('scanner-date-submit');
+      const cancelBtn = document.getElementById('scanner-date-cancel');
+
+      titleEl.textContent = title;
+      messageEl.textContent = message;
+      
+      // Set default date (today if not provided)
+      if (!defaultDate) {
+        const today = new Date();
+        const year = today.getFullYear();
+        const month = String(today.getMonth() + 1).padStart(2, '0');
+        const day = String(today.getDate()).padStart(2, '0');
+        defaultDate = `${year}-${month}-${day}`;
+      }
+      
+      input.value = defaultDate;
+      modal.classList.add('active');
+      
+      // Auto-focus triggers calendar on mobile
       setTimeout(() => input.focus(), 100);
 
       const handleSubmit = () => {
@@ -714,11 +793,10 @@ class BarcodeScanner {
       const batchData = await batchResponse.json();
       const batches = batchData.batches || [];
       
-      // Ask for expiration date using custom modal
-      const expiryDateInput = await this.showInputModal(
+      // Ask for expiration date using DATE PICKER
+      const expiryDateInput = await this.showDateModal(
         'Adjust Stock',
-        `Product: ${product.name}\n\nEnter expiration date:`,
-        'YYYY-MM-DD'
+        `Product: ${product.name}\n\nSelect expiration date:`
       );
       
       if (!expiryDateInput) {
@@ -874,11 +952,10 @@ class BarcodeScanner {
       
       const reasonText = reason === '1' ? 'Expired' : 'Damaged';
       
-      // Ask for date
-      const expiryDateInput = await this.showInputModal(
+      // Ask for date using DATE PICKER
+      const expiryDateInput = await this.showDateModal(
         'Discard Date',
-        `Enter ${reasonText.toLowerCase()} date:`,
-        'YYYY-MM-DD'
+        `Select ${reasonText.toLowerCase()} date:`
       );
       
       if (!expiryDateInput) {
