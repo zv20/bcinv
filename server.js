@@ -654,34 +654,6 @@ app.get('/api/export/expiring-soon', async (req, res) => {
   }
 });
 
-app.get('/api/export/low-stock', async (req, res) => {
-  try {
-    const { format = 'csv' } = req.query;
-    
-    if (format === 'csv') {
-      const csvData = await CSVExporter.exportLowStock(pool);
-      res.setHeader('Content-Type', 'text/csv');
-      res.setHeader('Content-Disposition', 'attachment; filename="low-stock.csv"');
-      res.send(csvData);
-    } else if (format === 'pdf') {
-      const pdfBuffer = await PDFExporter.exportLowStock(pool);
-      res.setHeader('Content-Type', 'application/pdf');
-      res.setHeader('Content-Disposition', 'attachment; filename="low-stock.pdf"');
-      res.send(pdfBuffer);
-    } else if (format === 'excel') {
-      const excelBuffer = await ExcelExporter.exportLowStock(pool);
-      res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-      res.setHeader('Content-Disposition', 'attachment; filename="low-stock.xlsx"');
-      res.send(excelBuffer);
-    } else {
-      res.status(400).json({ error: 'Invalid format. Use csv, pdf, or excel' });
-    }
-  } catch (error) {
-    logger.error('Export low stock error:', error);
-    res.status(500).json({ error: 'Failed to export data' });
-  }
-});
-
 app.get('/api/export/full-inventory', async (req, res) => {
   try {
     const { format = 'csv' } = req.query;
