@@ -9,6 +9,7 @@ class MobileNav {
     this.cameraMenuOverlay = null;
     this.settingsMenu = null;
     this.settingsMenuOverlay = null;
+    this.searchOverlay = null;
     this.init();
   }
 
@@ -24,17 +25,17 @@ class MobileNav {
         <a href="#dashboard" class="mobile-nav-item" data-page="dashboard">
           <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
-              d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/>
+              d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/>
           </svg>
-          <span>Home</span>
+          <span>Dashboard</span>
         </a>
         
-        <a href="#search" class="mobile-nav-item" data-page="search">
+        <a href="#inventory" class="mobile-nav-item" data-page="inventory">
           <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
-              d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+              d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>
           </svg>
-          <span>Search</span>
+          <span>Products</span>
         </a>
         
         <a href="#camera" class="mobile-nav-item camera-btn" data-page="camera">
@@ -47,12 +48,12 @@ class MobileNav {
           <span>Scan</span>
         </a>
         
-        <a href="#inventory" class="mobile-nav-item" data-page="inventory">
+        <a href="#search" class="mobile-nav-item" data-page="search">
           <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
-              d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/>
+              d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
           </svg>
-          <span>Products</span>
+          <span>Search</span>
         </a>
         
         <a href="#settings" class="mobile-nav-item" data-page="settings">
@@ -76,6 +77,8 @@ class MobileNav {
     this.renderCameraMenu();
     // Render settings menu
     this.renderSettingsMenu();
+    // Render search overlay
+    this.renderSearchOverlay();
   }
 
   renderCameraMenu() {
@@ -197,6 +200,58 @@ class MobileNav {
     this.settingsMenuOverlay = document.querySelector('.settings-menu-overlay');
   }
 
+  renderSearchOverlay() {
+    const overlayHTML = `
+      <div class="search-overlay">
+        <div class="search-header">
+          <button class="search-back-btn" aria-label="Close search">
+            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" width="24" height="24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/>
+            </svg>
+          </button>
+          <div class="search-input-wrapper">
+            <input type="text" class="search-input" placeholder="Search products..." id="mobileSearchInput" autocomplete="off">
+          </div>
+        </div>
+        
+        <div class="search-filters">
+          <div class="search-filter-group">
+            <label class="search-filter-label">Filter by Supplier</label>
+            <select class="search-filter-select" id="mobileSupplierFilter">
+              <option value="">All Suppliers</option>
+            </select>
+          </div>
+          
+          <div class="search-filter-group">
+            <label class="search-filter-label">Filter by Category</label>
+            <select class="search-filter-select" id="mobileCategoryFilter">
+              <option value="">All Categories</option>
+            </select>
+          </div>
+          
+          <button class="search-clear-btn" id="mobileClearFilters">
+            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" width="16" height="16">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+            </svg>
+            Clear Filters
+          </button>
+        </div>
+        
+        <div class="search-results" id="mobileSearchResults">
+          <div class="search-empty">
+            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" width="48" height="48" style="margin: 0 auto 16px; opacity: 0.3;">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+            </svg>
+            <p>Search for products by name or barcode</p>
+          </div>
+        </div>
+      </div>
+    `;
+
+    document.body.insertAdjacentHTML('beforeend', overlayHTML);
+    this.searchOverlay = document.querySelector('.search-overlay');
+  }
+
   attachEventListeners() {
     // Navigation item clicks
     document.querySelectorAll('.mobile-nav-item').forEach(item => {
@@ -245,6 +300,44 @@ class MobileNav {
         this.handleSettingsAction(action);
       });
     });
+
+    // Search overlay back button
+    const searchBackBtn = document.querySelector('.search-back-btn');
+    if (searchBackBtn) {
+      searchBackBtn.addEventListener('click', () => {
+        this.closeSearchOverlay();
+      });
+    }
+
+    // Search input
+    const searchInput = document.getElementById('mobileSearchInput');
+    if (searchInput) {
+      searchInput.addEventListener('input', () => {
+        this.performSearch();
+      });
+    }
+
+    // Filter dropdowns
+    const supplierFilter = document.getElementById('mobileSupplierFilter');
+    const categoryFilter = document.getElementById('mobileCategoryFilter');
+    if (supplierFilter) {
+      supplierFilter.addEventListener('change', () => {
+        this.performSearch();
+      });
+    }
+    if (categoryFilter) {
+      categoryFilter.addEventListener('change', () => {
+        this.performSearch();
+      });
+    }
+
+    // Clear filters button
+    const clearBtn = document.getElementById('mobileClearFilters');
+    if (clearBtn) {
+      clearBtn.addEventListener('click', () => {
+        this.clearSearchFilters();
+      });
+    }
   }
 
   navigateTo(page) {
@@ -291,9 +384,163 @@ class MobileNav {
     this.settingsMenuOverlay.classList.remove('active');
   }
 
-  openSearchOverlay() {
-    const event = new CustomEvent('openSearch');
-    document.dispatchEvent(event);
+  async openSearchOverlay() {
+    this.searchOverlay.classList.add('active');
+    
+    // Load filter options
+    await this.loadFilterOptions();
+    
+    // Focus search input
+    const searchInput = document.getElementById('mobileSearchInput');
+    if (searchInput) {
+      setTimeout(() => searchInput.focus(), 100);
+    }
+  }
+
+  closeSearchOverlay() {
+    this.searchOverlay.classList.remove('active');
+    this.clearSearchFilters();
+  }
+
+  async loadFilterOptions() {
+    try {
+      // Load suppliers
+      const suppliersResponse = await fetch('/api/suppliers');
+      const suppliersData = await suppliersResponse.json();
+      const suppliers = suppliersData.suppliers || suppliersData || [];
+      
+      const supplierSelect = document.getElementById('mobileSupplierFilter');
+      if (supplierSelect) {
+        supplierSelect.innerHTML = '<option value="">All Suppliers</option>';
+        suppliers.forEach(supplier => {
+          const option = document.createElement('option');
+          option.value = supplier.id;
+          option.textContent = supplier.name;
+          supplierSelect.appendChild(option);
+        });
+      }
+
+      // Load departments (categories)
+      const departmentsResponse = await fetch('/api/departments');
+      const departmentsData = await departmentsResponse.json();
+      const departments = departmentsData.departments || departmentsData || [];
+      
+      const categorySelect = document.getElementById('mobileCategoryFilter');
+      if (categorySelect) {
+        categorySelect.innerHTML = '<option value="">All Categories</option>';
+        departments.forEach(dept => {
+          const option = document.createElement('option');
+          option.value = dept.id;
+          option.textContent = dept.name;
+          categorySelect.appendChild(option);
+        });
+      }
+    } catch (error) {
+      console.error('Error loading filter options:', error);
+    }
+  }
+
+  async performSearch() {
+    const searchInput = document.getElementById('mobileSearchInput');
+    const supplierFilter = document.getElementById('mobileSupplierFilter');
+    const categoryFilter = document.getElementById('mobileCategoryFilter');
+    const resultsContainer = document.getElementById('mobileSearchResults');
+
+    const query = searchInput ? searchInput.value.trim() : '';
+    const supplierId = supplierFilter ? supplierFilter.value : '';
+    const categoryId = categoryFilter ? categoryFilter.value : '';
+
+    // Show empty state if no search term
+    if (!query && !supplierId && !categoryId) {
+      resultsContainer.innerHTML = `
+        <div class="search-empty">
+          <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" width="48" height="48" style="margin: 0 auto 16px; opacity: 0.3;">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+          </svg>
+          <p>Search for products by name or barcode</p>
+        </div>
+      `;
+      return;
+    }
+
+    try {
+      // Build query string
+      let url = '/api/products?';
+      if (query) url += `search=${encodeURIComponent(query)}&`;
+      if (supplierId) url += `supplier_id=${supplierId}&`;
+      if (categoryId) url += `department_id=${categoryId}&`;
+
+      const response = await fetch(url);
+      const data = await response.json();
+      let products = [];
+      
+      if (Array.isArray(data)) {
+        products = data;
+      } else if (data.products && Array.isArray(data.products)) {
+        products = data.products;
+      } else if (data.data && Array.isArray(data.data)) {
+        products = data.data;
+      }
+
+      if (products.length === 0) {
+        resultsContainer.innerHTML = `
+          <div class="search-empty">
+            <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" width="48" height="48" style="margin: 0 auto 16px; opacity: 0.3;">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+            </svg>
+            <p>No products found</p>
+          </div>
+        `;
+        return;
+      }
+
+      // Render results
+      resultsContainer.innerHTML = products.map(product => `
+        <div class="search-result-item" onclick="showProductDetails(${product.id}); window.mobileNav.closeSearchOverlay();">
+          <div class="search-result-info">
+            <div class="search-result-name">${this.escapeHtml(product.name)}</div>
+            <div class="search-result-meta">
+              ${product.sku ? `SKU: ${this.escapeHtml(product.sku)}` : ''}
+              ${product.department_name ? ` • ${this.escapeHtml(product.department_name)}` : ''}
+            </div>
+          </div>
+          <div class="search-result-stock">${product.total_quantity || 0}</div>
+        </div>
+      `).join('');
+    } catch (error) {
+      console.error('Error searching products:', error);
+      resultsContainer.innerHTML = `
+        <div class="search-empty">
+          <p style="color: var(--danger-color);">Error loading results</p>
+        </div>
+      `;
+    }
+  }
+
+  clearSearchFilters() {
+    const searchInput = document.getElementById('mobileSearchInput');
+    const supplierFilter = document.getElementById('mobileSupplierFilter');
+    const categoryFilter = document.getElementById('mobileCategoryFilter');
+    const resultsContainer = document.getElementById('mobileSearchResults');
+
+    if (searchInput) searchInput.value = '';
+    if (supplierFilter) supplierFilter.value = '';
+    if (categoryFilter) categoryFilter.value = '';
+    
+    resultsContainer.innerHTML = `
+      <div class="search-empty">
+        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" width="48" height="48" style="margin: 0 auto 16px; opacity: 0.3;">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+        </svg>
+        <p>Search for products by name or barcode</p>
+      </div>
+    `;
+  }
+
+  escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
   }
 
   handleCameraAction(action) {
@@ -304,7 +551,6 @@ class MobileNav {
     document.dispatchEvent(event);
 
     console.log(`Camera action: ${action}`);
-    // TODO: Implement camera scanner in Sprint 2
   }
 
   handleSettingsAction(action) {

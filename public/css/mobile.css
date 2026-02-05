@@ -29,6 +29,41 @@
   .container-fluid {
     padding-top: 16px;
   }
+
+  /* Compact Dashboard Stats */
+  #statsCards .col-md-3,
+  #statsCards .col-md-4,
+  #statsCards .col-md-6 {
+    flex: 0 0 50%;
+    max-width: 50%;
+  }
+
+  #statsCards .stat-card {
+    margin-bottom: 12px;
+    padding: 16px;
+  }
+
+  #statsCards .stat-value {
+    font-size: 1.5rem;
+  }
+
+  #statsCards h6 {
+    font-size: 13px;
+  }
+
+  /* Hide specific stats on mobile */
+  .mobile-hide-stat {
+    display: none !important;
+  }
+
+  /* Dashboard cards */
+  #dashboardView .row > div {
+    margin-bottom: 16px;
+  }
+
+  #dashboardView .card {
+    margin-bottom: 0;
+  }
 }
 
 /* Mobile table responsiveness */
@@ -432,6 +467,10 @@ body.mobile {
   padding: 12px 16px;
   border-bottom: 1px solid var(--border-color);
   gap: 12px;
+  background: var(--bg-primary);
+  position: sticky;
+  top: 0;
+  z-index: 10;
 }
 
 .search-back-btn {
@@ -440,6 +479,9 @@ body.mobile {
   padding: 8px;
   cursor: pointer;
   color: var(--text-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .search-input-wrapper {
@@ -458,6 +500,56 @@ body.mobile {
 
 .search-input:focus {
   border-color: var(--primary-color);
+}
+
+/* Search Filters */
+.search-filters {
+  padding: 16px;
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border-color);
+}
+
+.search-filter-group {
+  margin-bottom: 12px;
+}
+
+.search-filter-label {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin-bottom: 6px;
+}
+
+.search-filter-select {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  font-size: 15px;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+}
+
+.search-clear-btn {
+  width: 100%;
+  padding: 10px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.search-clear-btn:active {
+  background: var(--bg-secondary);
 }
 
 .search-results {
@@ -498,12 +590,17 @@ body.mobile {
   font-weight: 500;
   color: var(--text-primary);
   margin-left: 16px;
+  font-size: 15px;
 }
 
 .search-empty {
   text-align: center;
   padding: 48px 16px;
   color: var(--text-secondary);
+}
+
+.search-empty p {
+  margin: 0;
 }
 
 /* Content sections */
@@ -738,5 +835,9 @@ body.mobile {
 @media (min-width: 768px) {
   .mobile-nav {
     display: none;
+  }
+  
+  .search-overlay {
+    display: none !important;
   }
 }
