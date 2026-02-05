@@ -258,9 +258,73 @@ async function loadProducts() {
     try {
         const response = await fetch(`${API_URL}/products?limit=100`);
         const data = await response.json();
+        
+        // Render desktop table
         document.getElementById('productsTable').innerHTML = data.products.length === 0 ? '<tr><td colspan="7" class="text-center">No products found</td></tr>' :
-            data.products.map(p => `<tr><td>${p.name}</td><td>${p.sku || '-'}</td><td>${p.department_name || '-'}</td><td>${p.supplier_name || '-'}</td><td>${p.unit || '-'}</td><td>$${parseFloat(p.cost_price || 0).toFixed(2)}</td><td><button class="btn btn-sm btn-info btn-icon" onclick="showProductDetails(${p.id})" title="View Details"><i class="bi bi-eye"></i></button> <button class="btn btn-sm btn-primary btn-icon" onclick='editProduct(${JSON.stringify(p).replace(/'/g, "&apos;")})'><i class="bi bi-pencil"></i></button> <button class="btn btn-sm btn-danger btn-icon" onclick="deleteProduct(${p.id}, '${p.name.replace(/'/g, "\\'")}')\" ><i class="bi bi-trash"></i></button></td></tr>`).join('');
+            data.products.map(p => `<tr><td>${p.name}</td><td>${p.sku || '-'}</td><td>${p.department_name || '-'}</td><td>${p.supplier_name || '-'}</td><td>${p.unit || '-'}</td><td>$${parseFloat(p.cost_price || 0).toFixed(2)}</td><td><button class="btn btn-sm btn-info btn-icon" onclick="showProductDetails(${p.id})" title="View Details"><i class="bi bi-eye"></i></button> <button class="btn btn-sm btn-primary btn-icon" onclick='editProduct(${JSON.stringify(p).replace(/'/g, "&apos;")})'><i class="bi bi-pencil"></i></button> <button class="btn btn-sm btn-danger btn-icon" onclick="deleteProduct(${p.id}, '${p.name.replace(/'/g, "\\'")}')" ><i class="bi bi-trash"></i></button></td></tr>`).join('');
+        
+        // Render mobile cards
+        renderMobileProductCards(data.products);
     } catch (error) { console.error('Products error:', error); }
+}
+
+// Render mobile product cards
+function renderMobileProductCards(products) {
+    const container = document.getElementById('mobileProductCards');
+    if (!container) return;
+    
+    if (products.length === 0) {
+        container.innerHTML = '<div class="text-center text-muted py-4">No products found</div>';
+        return;
+    }
+    
+    container.innerHTML = products.map(p => {
+        // Calculate expiry info
+        let expiryInfo = '';
+        let expiryBadge = '';
+        
+        if (p.next_expiry_date) {
+            const daysLeft = Math.ceil((new Date(p.next_expiry_date) - new Date()) / 86400000);
+            const expiryDate = new Date(p.next_expiry_date).toLocaleDateString();
+            
+            if (daysLeft <= 7) {
+                expiryBadge = '<span class="product-card-badge badge-danger">⚠️ Expiring Soon</span>';
+                expiryInfo = `<div class="product-card-expiry text-danger">Expires: ${expiryDate} (${daysLeft} days)</div>`;
+            } else if (daysLeft <= 14) {
+                expiryInfo = `<div class="product-card-expiry text-warning">Expires: ${expiryDate} (${daysLeft} days)</div>`;
+            } else {
+                expiryInfo = `<div class="product-card-expiry">Expires: ${expiryDate}</div>`;
+            }
+        }
+        
+        return `
+            <div class="product-card" onclick="showProductDetails(${p.id})" role="button" tabindex="0">
+                ${expiryBadge}
+                <button class="product-card-edit" onclick="event.stopPropagation(); editProduct(${JSON.stringify(p).replace(/'/g, '&apos;')})" aria-label="Edit product">
+                    <i class="bi bi-pencil"></i>
+                </button>
+                <div class="product-card-header">
+                    <h3 class="product-card-name">${p.name}</h3>
+                </div>
+                <div class="product-card-meta">
+                    ${p.department_name ? `<span>${p.department_name}</span>` : ''}
+                    ${p.department_name && p.supplier_name ? '<span>•</span>' : ''}
+                    ${p.supplier_name ? `<span>${p.supplier_name}</span>` : ''}
+                </div>
+                <div class="product-card-details">
+                    <div class="product-card-detail-row">
+                        <span class="product-card-label">SKU:</span>
+                        <span class="product-card-value">${p.sku || 'N/A'}</span>
+                    </div>
+                    <div class="product-card-detail-row">
+                        <span class="product-card-label">Stock:</span>
+                        <span class="product-card-value">📦 ${p.total_quantity || 0} cases</span>
+                    </div>
+                </div>
+                ${expiryInfo}
+            </div>
+        `;
+    }).join('');
 }
 
 async function searchProducts() {
@@ -268,8 +332,13 @@ async function searchProducts() {
     try {
         const response = await fetch(`${API_URL}/products?search=${encodeURIComponent(search)}&limit=100`);
         const data = await response.json();
+        
+        // Render desktop table
         document.getElementById('productsTable').innerHTML = data.products.length === 0 ? '<tr><td colspan="7" class="text-center">No products found</td></tr>' :
-            data.products.map(p => `<tr><td>${p.name}</td><td>${p.sku || '-'}</td><td>${p.department_name || '-'}</td><td>${p.supplier_name || '-'}</td><td>${p.unit || '-'}</td><td>$${parseFloat(p.cost_price || 0).toFixed(2)}</td><td><button class="btn btn-sm btn-info btn-icon" onclick="showProductDetails(${p.id})" title="View Details"><i class="bi bi-eye"></i></button> <button class="btn btn-sm btn-primary btn-icon" onclick='editProduct(${JSON.stringify(p).replace(/'/g, "&apos;")})'><i class="bi bi-pencil"></i></button> <button class="btn btn-sm btn-danger btn-icon" onclick="deleteProduct(${p.id}, '${p.name.replace(/'/g, "\\'")}')\" ><i class="bi bi-trash"></i></button></td></tr>`).join('');
+            data.products.map(p => `<tr><td>${p.name}</td><td>${p.sku || '-'}</td><td>${p.department_name || '-'}</td><td>${p.supplier_name || '-'}</td><td>${p.unit || '-'}</td><td>$${parseFloat(p.cost_price || 0).toFixed(2)}</td><td><button class="btn btn-sm btn-info btn-icon" onclick="showProductDetails(${p.id})" title="View Details"><i class="bi bi-eye"></i></button> <button class="btn btn-sm btn-primary btn-icon" onclick='editProduct(${JSON.stringify(p).replace(/'/g, "&apos;")})'><i class="bi bi-pencil"></i></button> <button class="btn btn-sm btn-danger btn-icon" onclick="deleteProduct(${p.id}, '${p.name.replace(/'/g, "\\'")}')" ><i class="bi bi-trash"></i></button></td></tr>`).join('');
+        
+        // Render mobile cards
+        renderMobileProductCards(data.products);
     } catch (error) { console.error('Search error:', error); }
 }
 
@@ -469,7 +538,7 @@ async function loadDepartments() {
     try {
         const depts = await fetch(`${API_URL}/departments`).then(r => r.json());
         document.getElementById('departmentsTable').innerHTML = depts.length === 0 ? '<tr><td colspan="4" class="text-center">No departments</td></tr>' :
-            depts.map(d => `<tr><td><strong>${d.name}</strong></td><td>${d.description || '-'}</td><td>${new Date(d.created_at).toLocaleDateString()}</td><td><button class="btn btn-sm btn-primary btn-icon" onclick='editDepartment(${JSON.stringify(d).replace(/'/g, "&apos;")})'><i class="bi bi-pencil"></i></button> <button class="btn btn-sm btn-danger btn-icon" onclick="deleteDepartment(${d.id}, '${d.name.replace(/'/g, "\\'")}')\" ><i class="bi bi-trash"></i></button></td></tr>`).join('');
+            depts.map(d => `<tr><td><strong>${d.name}</strong></td><td>${d.description || '-'}</td><td>${new Date(d.created_at).toLocaleDateString()}</td><td><button class="btn btn-sm btn-primary btn-icon" onclick='editDepartment(${JSON.stringify(d).replace(/'/g, "&apos;")})'><i class="bi bi-pencil"></i></button> <button class="btn btn-sm btn-danger btn-icon" onclick="deleteDepartment(${d.id}, '${d.name.replace(/'/g, "\\'")}')" ><i class="bi bi-trash"></i></button></td></tr>`).join('');
     } catch (error) { console.error('Departments error:', error); }
 }
 
@@ -523,7 +592,7 @@ async function loadSuppliers() {
     try {
         const suppliers = await fetch(`${API_URL}/suppliers`).then(r => r.json());
         document.getElementById('suppliersTable').innerHTML = suppliers.length === 0 ? '<tr><td colspan="5" class="text-center">No suppliers</td></tr>' :
-            suppliers.map(s => `<tr><td><strong>${s.name}</strong></td><td>${s.contact_name || '-'}</td><td>${s.phone || '-'}</td><td>${s.email || '-'}</td><td><button class="btn btn-sm btn-primary btn-icon" onclick='editSupplier(${JSON.stringify(s).replace(/'/g, "&apos;")})'><i class="bi bi-pencil"></i></button> <button class="btn btn-sm btn-danger btn-icon" onclick="deleteSupplier(${s.id}, '${s.name.replace(/'/g, "\\'")}')\" ><i class="bi bi-trash"></i></button></td></tr>`).join('');
+            suppliers.map(s => `<tr><td><strong>${s.name}</strong></td><td>${s.contact_name || '-'}</td><td>${s.phone || '-'}</td><td>${s.email || '-'}</td><td><button class="btn btn-sm btn-primary btn-icon" onclick='editSupplier(${JSON.stringify(s).replace(/'/g, "&apos;")})'><i class="bi bi-pencil"></i></button> <button class="btn btn-sm btn-danger btn-icon" onclick="deleteSupplier(${s.id}, '${s.name.replace(/'/g, "\\'")}')" ><i class="bi bi-trash"></i></button></td></tr>`).join('');
     } catch (error) { console.error('Suppliers error:', error); }
 }
 
@@ -581,7 +650,7 @@ async function loadLocations() {
     try {
         const locs = await fetch(`${API_URL}/locations`).then(r => r.json());
         document.getElementById('locationsTable').innerHTML = locs.length === 0 ? '<tr><td colspan="5" class="text-center">No locations</td></tr>' :
-            locs.map(l => `<tr><td><strong>${l.name}</strong></td><td>${l.section || '-'}</td><td>${l.description || '-'}</td><td>${new Date(l.created_at).toLocaleDateString()}</td><td><button class="btn btn-sm btn-primary btn-icon" onclick='editLocation(${JSON.stringify(l).replace(/'/g, "&apos;")})'><i class="bi bi-pencil"></i></button> <button class="btn btn-sm btn-danger btn-icon" onclick="deleteLocation(${l.id}, '${l.name.replace(/'/g, "\\'")}')\" ><i class="bi bi-trash"></i></button></td></tr>`).join('');
+            locs.map(l => `<tr><td><strong>${l.name}</strong></td><td>${l.section || '-'}</td><td>${l.description || '-'}</td><td>${new Date(l.created_at).toLocaleDateString()}</td><td><button class="btn btn-sm btn-primary btn-icon" onclick='editLocation(${JSON.stringify(l).replace(/'/g, "&apos;")})'><i class="bi bi-pencil"></i></button> <button class="btn btn-sm btn-danger btn-icon" onclick="deleteLocation(${l.id}, '${l.name.replace(/'/g, "\\'")}')" ><i class="bi bi-trash"></i></button></td></tr>`).join('');
     } catch (error) { console.error('Locations error:', error); }
 }
 
