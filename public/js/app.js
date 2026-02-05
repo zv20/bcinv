@@ -22,7 +22,6 @@ function clearCache() {
 function showDashboard() { hideAllViews(); document.getElementById('dashboardView').style.display = 'block'; document.querySelector('a[onclick*="showDashboard"]').classList.add('active'); loadDashboard(); }
 function showProducts() { hideAllViews(); document.getElementById('productsView').style.display = 'block'; document.querySelector('a[onclick*="showProducts"]').classList.add('active'); loadProducts(); }
 function showStock() { hideAllViews(); document.getElementById('stockView').style.display = 'block'; document.querySelector('a[onclick*="showStock"]').classList.add('active'); loadStock(); }
-function showExpiring() { hideAllViews(); document.getElementById('expiringView').style.display = 'block'; document.querySelector('a[onclick*="showExpiring"]').classList.add('active'); loadExpiring(); }
 function showDepartments() { hideAllViews(); document.getElementById('departmentsView').style.display = 'block'; loadDepartments(); }
 function showSuppliers() { hideAllViews(); document.getElementById('suppliersView').style.display = 'block'; loadSuppliers(); }
 function showLocations() { hideAllViews(); document.getElementById('locationsView').style.display = 'block'; loadLocations(); }
@@ -521,17 +520,6 @@ async function discardStock(batchId, productName, quantity) {
         console.error('Discard error:', error);
         alert('Failed to discard stock: ' + error.message);
     }
-}
-
-async function loadExpiring() {
-    try {
-        const expiring = await fetch(`${API_URL}/expiring`).then(r => r.json());
-        document.getElementById('expiringTable').innerHTML = expiring.length === 0 ? '<tr><td colspan="7" class="text-center text-success">No items expiring soon! 🎉</td></tr>' :
-            expiring.map(item => {
-                const cls = item.days_until_expiry <= 3 ? 'text-danger' : 'text-warning';
-                return `<tr><td>${item.product_name}</td><td>${item.sku || '-'}</td><td>${item.location_name || '-'}</td><td>${parseFloat(item.quantity).toFixed(2)}</td><td class="${cls}">${new Date(item.expiry_date).toLocaleDateString()}</td><td class="${cls}"><strong>${Math.floor(item.days_until_expiry)} days</strong></td><td><button class="btn btn-sm btn-danger btn-icon" onclick="discardStock(${item.batch_id}, '${item.product_name.replace(/'/g, "\\'")}', ${item.quantity})"><i class="bi bi-trash"></i> Discard</button></td></tr>`;
-            }).join('');
-    } catch (error) { console.error('Expiring error:', error); }
 }
 
 async function loadDepartments() {
