@@ -1,7 +1,7 @@
 /**
  * Barcode Scanner Component
  * Uses html5-qrcode library for camera scanning
- * Optimized for small printed barcodes
+ * Optimized for small printed barcodes with visual detection feedback
  */
 
 class BarcodeScanner {
@@ -629,16 +629,15 @@ class BarcodeScanner {
       }
 
       this.scanner = new Html5Qrcode('barcode-scanner-reader', {
-        verbose: true // Enable verbose logging for debugging
+        verbose: false // Disable verbose logging for cleaner console
       });
       
-      // AGGRESSIVE config for VERY SMALL printed barcodes
-      // Remove qrbox to scan entire frame - better for small barcodes
+      // Config with qrbox enabled - draws box around detected barcodes
       const config = {
         fps: 20, // Maximum scan rate
-        // NO qrbox - scan entire frame for better small barcode detection
+        qrbox: { width: 300, height: 150 }, // Visual detection box - shows where barcode is detected
         disableFlip: false,
-        // Let library auto-detect all barcode formats (more compatible)
+        // Let library auto-detect all barcode formats
         experimentalFeatures: {
           useBarCodeDetectorIfSupported: true // Use native detector if available
         }
@@ -647,7 +646,7 @@ class BarcodeScanner {
       // Simple camera constraints - just request back camera
       const cameraConfig = { facingMode: 'environment' };
 
-      console.log('Requesting camera access with aggressive barcode detection...');
+      console.log('Starting camera with visual detection box...');
 
       await this.scanner.start(
         cameraConfig,
@@ -658,16 +657,13 @@ class BarcodeScanner {
           this.handleScanResult(decodedText);
         },
         (errorMessage) => {
-          // Scanning errors are normal, only log occasionally
-          if (Math.random() < 0.01) { // Log 1% of errors to avoid spam
-            console.log('Scanning...', errorMessage);
-          }
+          // Scanning errors are normal, suppress console spam
         }
       );
 
       this.isScanning = true;
-      console.log('Camera started - scanning entire frame at 20 FPS');
-      this.showToast('Camera ready - Hold 6-10 inches away', 'info');
+      console.log('Camera started with visual detection feedback');
+      this.showToast('Camera ready - Align barcode in box', 'info');
     } catch (err) {
       console.error('Error starting camera:', err);
       console.error('Error details:', err.message, err.name);
