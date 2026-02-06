@@ -161,6 +161,11 @@ class BarcodeScanner {
           color: #374151;
         }
 
+        /* Lower z-index when Bootstrap modal is open */
+        .barcode-scanner-overlay.modal-open {
+          z-index: 1040 !important;
+        }
+
         @media (max-width: 480px) {
           .scanner-controls {
             padding: 10px 12px;
@@ -715,7 +720,7 @@ class BarcodeScanner {
     });
   }
 
-  // Helper to wait for Bootstrap modal to close
+  // Helper to wait for Bootstrap modal to close and manage z-index
   waitForBootstrapModal(modalId) {
     return new Promise((resolve) => {
       const modalElement = document.getElementById(modalId);
@@ -724,9 +729,18 @@ class BarcodeScanner {
         return;
       }
 
+      // Lower scanner z-index so Bootstrap modal appears on top
+      console.log('Lowering scanner z-index for Bootstrap modal...');
+      this.scannerElement.classList.add('modal-open');
+
       const handleHidden = () => {
         modalElement.removeEventListener('hidden.bs.modal', handleHidden);
         console.log('✓ Bootstrap modal closed:', modalId);
+        
+        // Restore scanner z-index
+        this.scannerElement.classList.remove('modal-open');
+        console.log('Scanner z-index restored');
+        
         resolve();
       };
 
@@ -736,6 +750,7 @@ class BarcodeScanner {
       setTimeout(() => {
         if (!modalElement.classList.contains('show')) {
           modalElement.removeEventListener('hidden.bs.modal', handleHidden);
+          this.scannerElement.classList.remove('modal-open');
           resolve();
         }
       }, 500);
@@ -969,6 +984,7 @@ class BarcodeScanner {
     this.flashlightOn = false;
     this.waitingForModalClose = false;
     this.scannerElement.classList.remove('active');
+    this.scannerElement.classList.remove('modal-open');
     console.log('Scanner closed');
   }
 
