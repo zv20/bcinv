@@ -170,10 +170,10 @@ function renderExpiringTable() {
             <td class="${daysClass}">${new Date(item.expiry_date).toLocaleDateString()}</td>
             <td class="${daysClass}">${item.days_until_expiry} days</td>
             <td>
-                <button class="btn btn-sm btn-warning btn-icon" onclick="adjustStock(${item.id}, '${item.product_name.replace(/'/g, "\\'")}'Edits, ${item.quantity})" title="Adjust Stock">
+                <button class="btn btn-sm btn-warning btn-icon" onclick="adjustStock(${item.id}, '${item.product_name.replace(/'/g, "\\'")}', ${item.quantity})" title="Adjust Stock">
                     <i class="bi bi-pencil"></i>
                 </button>
-                <button class="btn btn-sm btn-danger btn-icon" onclick="discardStock(${item.id}, '${item.product_name.replace(/'/g, "\\'")}'Edits, ${item.quantity})" title="Discard">
+                <button class="btn btn-sm btn-danger btn-icon" onclick="discardStock(${item.id}, '${item.product_name.replace(/'/g, "\\'")}', ${item.quantity})" title="Discard">
                     <i class="bi bi-trash"></i>
                 </button>
             </td>
@@ -655,7 +655,7 @@ function renderProductsTable() {
     const pageProducts = perPage === 'all' ? filteredProducts : filteredProducts.slice(start, end);
     
     document.getElementById('productsTable').innerHTML = pageProducts.length === 0 ? '<tr><td colspan="7" class="text-center">No products found</td></tr>' :
-        pageProducts.map(p => `<tr><td>${p.name}</td><td>${p.sku || '-'}</td><td>${p.department_name || '-'}</td><td>${p.supplier_name || '-'}</td><td>${p.unit || '-'}</td><td>$${parseFloat(p.cost_price || 0).toFixed(2)}</td><td><button class="btn btn-sm btn-info btn-icon" onclick="showProductDetails(${p.id})" title="View Details"><i class="bi bi-eye"></i></button> <button class="btn btn-sm btn-primary btn-icon" onclick='editProduct(${JSON.stringify(p).replace(/'/g, "&apos;")})'><i class="bi bi-pencil"></i></button> <button class="btn btn-sm btn-danger btn-icon" onclick="deleteProduct(${p.id}, '${p.name.replace(/'/g, "\\'")}')" ><i class="bi bi-trash"></i></button></td></tr>`).join('');
+        pageProducts.map(p => `<tr><td>${p.name}</td><td>${p.sku || '-'}</td><td>${p.department_name || '-'}</td><td>${p.supplier_name || '-'}</td><td>${p.unit || '-'}</td><td>$${parseFloat(p.cost_price || 0).toFixed(2)}</td><td><button class="btn btn-sm btn-info btn-icon" onclick="showProductDetails(${p.id})" title="View Details"><i class="bi bi-eye"></i></button> <button class="btn btn-sm btn-primary btn-icon" onclick='editProduct(${JSON.stringify(p).replace(/'/g, "&apos;")})'><i class="bi bi-pencil"></i></button> <button class="btn btn-sm btn-danger btn-icon" onclick="deleteProduct(${p.id}, '${p.name.replace(/'/g, "\\'")}')"><i class="bi bi-trash"></i></button></td></tr>`).join('');
     
     const actualStart = pageProducts.length === 0 ? 0 : start + 1;
     const actualEnd = Math.min(end, filteredProducts.length);
@@ -806,9 +806,15 @@ function renderMobileProductCards(products) {
 }
 
 async function showAddProductModal() {
-    const [depts, suppliers] = await Promise.all([fetch(`${API_URL}/departments`).then(r => r.json()), fetch(`${API_URL}/suppliers`).then(r => r.json())]);
+    const [depts, suppliers, locations] = await Promise.all([
+        fetch(`${API_URL}/departments`).then(r => r.json()), 
+        fetch(`${API_URL}/suppliers`).then(r => r.json()),
+        fetch(`${API_URL}/locations`).then(r => r.json())
+    ]);
     document.getElementById('addProductDepartment').innerHTML = '<option value="">Select department...</option>' + depts.map(d => `<option value="${d.id}">${d.name}</option>`).join('');
     document.getElementById('addProductSupplier').innerHTML = '<option value="">Select supplier...</option>' + suppliers.map(s => `<option value="${s.id}">${s.name}</option>`).join('');
+    document.getElementById('addProductStorageLocation').innerHTML = '<option value="">No storage location</option>' + locations.map(l => `<option value="${l.id}">${l.name}</option>`).join('');
+    document.getElementById('addProductShelfLocation').innerHTML = '<option value="">No shelf location</option>' + locations.map(l => `<option value="${l.id}">${l.name}</option>`).join('');
     document.getElementById('addProductForm').reset();
     new bootstrap.Modal(document.getElementById('addProductModal')).show();
 }
@@ -829,9 +835,15 @@ async function addProduct() {
 }
 
 async function editProduct(product) {
-    const [depts, suppliers] = await Promise.all([fetch(`${API_URL}/departments`).then(r => r.json()), fetch(`${API_URL}/suppliers`).then(r => r.json())]);
+    const [depts, suppliers, locations] = await Promise.all([
+        fetch(`${API_URL}/departments`).then(r => r.json()), 
+        fetch(`${API_URL}/suppliers`).then(r => r.json()),
+        fetch(`${API_URL}/locations`).then(r => r.json())
+    ]);
     document.getElementById('editProductDepartment').innerHTML = '<option value="">Select department...</option>' + depts.map(d => `<option value="${d.id}" ${d.id == product.department_id ? 'selected' : ''}>${d.name}</option>`).join('');
     document.getElementById('editProductSupplier').innerHTML = '<option value="">Select supplier...</option>' + suppliers.map(s => `<option value="${s.id}" ${s.id == product.supplier_id ? 'selected' : ''}>${s.name}</option>`).join('');
+    document.getElementById('editProductStorageLocation').innerHTML = '<option value="">No storage location</option>' + locations.map(l => `<option value="${l.id}" ${l.id == product.storage_location_id ? 'selected' : ''}>${l.name}</option>`).join('');
+    document.getElementById('editProductShelfLocation').innerHTML = '<option value="">No shelf location</option>' + locations.map(l => `<option value="${l.id}" ${l.id == product.shelf_location_id ? 'selected' : ''}>${l.name}</option>`).join('');
     document.getElementById('editProductId').value = product.id;
     document.getElementById('editProductName').value = product.name;
     document.getElementById('editProductSku').value = product.sku || '';
@@ -912,7 +924,7 @@ async function addStock() {
 }
 
 async function adjustStock(batchId, productName, currentQty) {
-    const newQty = prompt(`Adjust "${productName}"\nCurrent: ${currentQty}\nNew quantity:`, currentQty);
+    const newQty = prompt(`Adjust "${productName}"\\nCurrent: ${currentQty}\\nNew quantity:`, currentQty);
     if (newQty === null) return;
     const notes = prompt('Reason (optional):');
     try {
@@ -948,7 +960,7 @@ async function adjustStock(batchId, productName, currentQty) {
 }
 
 async function discardStock(batchId, productName, quantity) {
-    const reason = prompt(`Discard "${productName}" (${quantity})\n1. Expired\n2. Damaged\n3. Other\n\nEnter 1-3:`);
+    const reason = prompt(`Discard "${productName}" (${quantity})\\n1. Expired\\n2. Damaged\\n3. Other\\n\\nEnter 1-3:`);
     if (!reason) return;
     const qtyToDiscard = prompt('Quantity:', quantity);
     if (!qtyToDiscard) return;
@@ -988,7 +1000,7 @@ async function loadDepartments() {
     try {
         const depts = await fetch(`${API_URL}/departments`).then(r => r.json());
         document.getElementById('departmentsTable').innerHTML = depts.length === 0 ? '<tr><td colspan="4" class="text-center">No departments</td></tr>' :
-            depts.map(d => `<tr><td><strong>${d.name}</strong></td><td>${d.description || '-'}</td><td>${new Date(d.created_at).toLocaleDateString()}</td><td><button class="btn btn-sm btn-primary btn-icon" onclick='editDepartment(${JSON.stringify(d).replace(/'/g, "&apos;")})'><i class="bi bi-pencil"></i></button> <button class="btn btn-sm btn-danger btn-icon" onclick="deleteDepartment(${d.id}, '${d.name.replace(/'/g, "\\'")}')" ><i class="bi bi-trash"></i></button></td></tr>`).join('');
+            depts.map(d => `<tr><td><strong>${d.name}</strong></td><td>${d.description || '-'}</td><td>${new Date(d.created_at).toLocaleDateString()}</td><td><button class="btn btn-sm btn-primary btn-icon" onclick='editDepartment(${JSON.stringify(d).replace(/'/g, "&apos;")})'><i class="bi bi-pencil"></i></button> <button class="btn btn-sm btn-danger btn-icon" onclick="deleteDepartment(${d.id}, '${d.name.replace(/'/g, "\\'")}')"><i class="bi bi-trash"></i></button></td></tr>`).join('');
     } catch (error) { console.error('Departments error:', error); }
 }
 
@@ -1042,7 +1054,7 @@ async function loadSuppliers() {
     try {
         const suppliers = await fetch(`${API_URL}/suppliers`).then(r => r.json());
         document.getElementById('suppliersTable').innerHTML = suppliers.length === 0 ? '<tr><td colspan="5" class="text-center">No suppliers</td></tr>' :
-            suppliers.map(s => `<tr><td><strong>${s.name}</strong></td><td>${s.contact_name || '-'}</td><td>${s.phone || '-'}</td><td>${s.email || '-'}</td><td><button class="btn btn-sm btn-primary btn-icon" onclick='editSupplier(${JSON.stringify(s).replace(/'/g, "&apos;")})'><i class="bi bi-pencil"></i></button> <button class="btn btn-sm btn-danger btn-icon" onclick="deleteSupplier(${s.id}, '${s.name.replace(/'/g, "\\'")}')" ><i class="bi bi-trash"></i></button></td></tr>`).join('');
+            suppliers.map(s => `<tr><td><strong>${s.name}</strong></td><td>${s.contact_name || '-'}</td><td>${s.phone || '-'}</td><td>${s.email || '-'}</td><td><button class="btn btn-sm btn-primary btn-icon" onclick='editSupplier(${JSON.stringify(s).replace(/'/g, "&apos;")})'><i class="bi bi-pencil"></i></button> <button class="btn btn-sm btn-danger btn-icon" onclick="deleteSupplier(${s.id}, '${s.name.replace(/'/g, "\\'")}')"><i class="bi bi-trash"></i></button></td></tr>`).join('');
     } catch (error) { console.error('Suppliers error:', error); }
 }
 
@@ -1100,7 +1112,7 @@ async function loadLocations() {
     try {
         const locs = await fetch(`${API_URL}/locations`).then(r => r.json());
         document.getElementById('locationsTable').innerHTML = locs.length === 0 ? '<tr><td colspan="5" class="text-center">No locations</td></tr>' :
-            locs.map(l => `<tr><td><strong>${l.name}</strong></td><td>${l.section || '-'}</td><td>${l.description || '-'}</td><td>${new Date(l.created_at).toLocaleDateString()}</td><td><button class="btn btn-sm btn-primary btn-icon" onclick='editLocation(${JSON.stringify(l).replace(/'/g, "&apos;")})'><i class="bi bi-pencil"></i></button> <button class="btn btn-sm btn-danger btn-icon" onclick="deleteLocation(${l.id}, '${l.name.replace(/'/g, "\\'")}')" ><i class="bi bi-trash"></i></button></td></tr>`).join('');
+            locs.map(l => `<tr><td><strong>${l.name}</strong></td><td>${l.section || '-'}</td><td>${l.description || '-'}</td><td>${new Date(l.created_at).toLocaleDateString()}</td><td><button class="btn btn-sm btn-primary btn-icon" onclick='editLocation(${JSON.stringify(l).replace(/'/g, "&apos;")})'><i class="bi bi-pencil"></i></button> <button class="btn btn-sm btn-danger btn-icon" onclick="deleteLocation(${l.id}, '${l.name.replace(/'/g, "\\'")}')"><i class="bi bi-trash"></i></button></td></tr>`).join('');
     } catch (error) { console.error('Locations error:', error); }
 }
 
