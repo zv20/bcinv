@@ -16,6 +16,7 @@ class BarcodeScanner {
     this.scannerElement = null;
     this.locations = [];
     this.waitingForModalClose = false;
+    this.modalObserver = null;
     this.init();
   }
 
@@ -23,6 +24,7 @@ class BarcodeScanner {
     this.createScannerUI();
     this.createModalUI();
     this.attachEventListeners();
+    this.setupGlobalModalMonitor();
     this.loadLocations();
   }
 
@@ -37,6 +39,49 @@ class BarcodeScanner {
     } catch (err) {
       console.error('Error loading locations:', err);
     }
+  }
+
+  // Global Bootstrap modal monitor - keeps scanner below ALL modals
+  setupGlobalModalMonitor() {
+    // Monitor for any Bootstrap modal opening
+    document.addEventListener('show.bs.modal', (e) => {
+      if (this.isScanning && this.continuousMode) {
+        console.log('Bootstrap modal opening:', e.target.id);
+        this.scannerElement.classList.add('modal-open');
+      }
+    });
+
+    // Monitor for any Bootstrap modal closing
+    document.addEventListener('hidden.bs.modal', (e) => {
+      if (this.isScanning && this.continuousMode) {
+        console.log('Bootstrap modal closed:', e.target.id);
+        
+        // Check if there are any other modals still open
+        setTimeout(() => {
+          const openModals = document.querySelectorAll('.modal.show');
+          console.log('Open modals after close:', openModals.length);
+          
+          if (openModals.length === 0) {
+            // No more modals - restore scanner z-index and resume
+            console.log('All modals closed - restoring scanner');
+            this.scannerElement.classList.remove('modal-open');
+            this.waitingForModalClose = false;
+            
+            // Resume camera in continuous mode
+            if (this.scanner && this.isScanning && !this.isProcessing) {
+              this.scanner.resume()
+                .then(() => {
+                  console.log('✓ Camera resumed after modal close');
+                  this.showToast('Ready for next scan', 'info');
+                })
+                .catch(err => console.error('Error resuming camera:', err));
+            }
+          }
+        }, 100);
+      }
+    });
+
+    console.log('Global Bootstrap modal monitor installed');
   }
 
   createScannerUI() {
@@ -720,43 +765,6 @@ class BarcodeScanner {
     });
   }
 
-  // Helper to wait for Bootstrap modal to close and manage z-index
-  waitForBootstrapModal(modalId) {
-    return new Promise((resolve) => {
-      const modalElement = document.getElementById(modalId);
-      if (!modalElement) {
-        resolve();
-        return;
-      }
-
-      // Lower scanner z-index so Bootstrap modal appears on top
-      console.log('Lowering scanner z-index for Bootstrap modal...');
-      this.scannerElement.classList.add('modal-open');
-
-      const handleHidden = () => {
-        modalElement.removeEventListener('hidden.bs.modal', handleHidden);
-        console.log('✓ Bootstrap modal closed:', modalId);
-        
-        // Restore scanner z-index
-        this.scannerElement.classList.remove('modal-open');
-        console.log('Scanner z-index restored');
-        
-        resolve();
-      };
-
-      modalElement.addEventListener('hidden.bs.modal', handleHidden);
-      
-      // Fallback timeout in case modal is already closed
-      setTimeout(() => {
-        if (!modalElement.classList.contains('show')) {
-          modalElement.removeEventListener('hidden.bs.modal', handleHidden);
-          this.scannerElement.classList.remove('modal-open');
-          resolve();
-        }
-      }, 500);
-    });
-  }
-
   attachEventListeners() {
     // Close button
     const closeBtn = document.querySelector('.barcode-scanner-close');
@@ -1039,19 +1047,8 @@ class BarcodeScanner {
         console.log('Single scan mode - closing scanner');
         await this.closeScanner();
       } else {
-        console.log('Continuous mode - waiting for modals to close before resuming');
-        // Wait a bit for any modals to finish animating
-        setTimeout(async () => {
-          if (this.scanner && this.isScanning && !this.waitingForModalClose) {
-            try {
-              await this.scanner.resume();
-              console.log('✓ Scanner resumed for next scan');
-              this.showToast('Ready for next scan', 'info');
-            } catch (err) {
-              console.error('Error resuming scanner:', err);
-            }
-          }
-        }, 1000);
+        console.log('Continuous mode - global modal monitor will handle resume');
+        this.waitingForModalClose = true;
       }
     } catch (error) {
       console.error('Error processing scan:', error);
@@ -1069,7 +1066,6 @@ class BarcodeScanner {
 
   async handleAddItem(barcode) {
     console.log('handleAddItem called with barcode:', barcode);
-    this.waitingForModalClose = true;
     
     try {
       const response = await fetch(`/api/products?search=${encodeURIComponent(barcode)}`);
@@ -1104,16 +1100,6 @@ class BarcodeScanner {
           if (typeof editProduct === 'function') {
             editProduct(existingProduct);
           }
-          
-          // Wait for edit modal to close in continuous mode
-          if (this.continuousMode) {
-            this.waitForBootstrapModal('editProductModal').then(() => {
-              this.waitingForModalClose = false;
-              console.log('Edit modal closed - ready for next scan');
-            });
-          } else {
-            this.waitingForModalClose = false;
-          }
         }, 300);
         
         return;
@@ -1138,29 +1124,17 @@ class BarcodeScanner {
               if (nameInput) nameInput.focus();
             }
           }, 500);
-          
-          // Wait for add modal to close in continuous mode
-          if (this.continuousMode) {
-            this.waitForBootstrapModal('addProductModal').then(() => {
-              this.waitingForModalClose = false;
-              console.log('Add modal closed - ready for next scan');
-            });
-          } else {
-            this.waitingForModalClose = false;
-          }
         }
       }, 300);
       
     } catch (err) {
       console.error('Error in handleAddItem:', err);
       this.showToast('Error: ' + err.message, 'error');
-      this.waitingForModalClose = false;
     }
   }
 
   async handleCheckStock(barcode) {
     console.log('handleCheckStock called with barcode:', barcode);
-    this.waitingForModalClose = true;
     
     try {
       const response = await fetch(`/api/products?search=${encodeURIComponent(barcode)}`);
@@ -1183,7 +1157,6 @@ class BarcodeScanner {
       
       if (!product) {
         this.showToast('Product not found!', 'error');
-        this.waitingForModalClose = false;
         return;
       }
 
@@ -1195,30 +1168,16 @@ class BarcodeScanner {
         setTimeout(() => {
           if (typeof showProductDetails === 'function') {
             showProductDetails(product.id);
-            
-            // Wait for product details modal to close in continuous mode
-            if (this.continuousMode) {
-              this.waitForBootstrapModal('productDetailsModal').then(() => {
-                this.waitingForModalClose = false;
-                console.log('Product details modal closed - ready for next scan');
-              });
-            } else {
-              this.waitingForModalClose = false;
-            }
           } else {
             console.error('showProductDetails function not found');
             this.showToast('Error opening product details', 'error');
-            this.waitingForModalClose = false;
           }
         }, 800);
-      } else {
-        this.waitingForModalClose = false;
       }
       
     } catch (err) {
       console.error('Error in handleCheckStock:', err);
       this.showToast('Error: ' + err.message, 'error');
-      this.waitingForModalClose = false;
     }
   }
 
