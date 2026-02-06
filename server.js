@@ -526,7 +526,7 @@ app.post('/api/products/:id/adjust', async (req, res) => {
 });
 
 app.post('/api/products', async (req, res) => {
-  const { name, category, sku, barcode, unit, description, cost_price, department_id, supplier_id, min_stock_level } = req.body;
+  const { name, category, sku, barcode, unit, description, cost_price, department_id, supplier_id, min_stock_level, storage_location_id, shelf_location_id } = req.body;
   
   if (!name) {
     return res.status(400).json({ error: 'Product name is required' });
@@ -534,8 +534,8 @@ app.post('/api/products', async (req, res) => {
   
   try {
     const result = await pool.query(
-      `INSERT INTO products (name, category, sku, barcode, unit, description, cost_price, department_id, supplier_id, min_stock_level)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+      `INSERT INTO products (name, category, sku, barcode, unit, description, cost_price, department_id, supplier_id, min_stock_level, storage_location_id, shelf_location_id)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
        RETURNING *`,
       [
         name, 
@@ -547,7 +547,9 @@ app.post('/api/products', async (req, res) => {
         emptyToNull(cost_price),
         emptyToNull(department_id),
         emptyToNull(supplier_id),
-        emptyToNull(min_stock_level) || 10
+        emptyToNull(min_stock_level) || 10,
+        emptyToNull(storage_location_id),
+        emptyToNull(shelf_location_id)
       ]
     );
     
@@ -564,7 +566,7 @@ app.post('/api/products', async (req, res) => {
 });
 
 app.put('/api/products/:id', async (req, res) => {
-  const { name, category, sku, barcode, unit, description, cost_price, department_id, supplier_id, min_stock_level } = req.body;
+  const { name, category, sku, barcode, unit, description, cost_price, department_id, supplier_id, min_stock_level, storage_location_id, shelf_location_id } = req.body;
   
   try {
     const result = await pool.query(
@@ -579,8 +581,10 @@ app.put('/api/products/:id', async (req, res) => {
            department_id = $8,
            supplier_id = $9,
            min_stock_level = $10,
+           storage_location_id = $11,
+           shelf_location_id = $12,
            updated_at = CURRENT_TIMESTAMP
-       WHERE id = $11
+       WHERE id = $13
        RETURNING *`,
       [
         emptyToNull(name), 
@@ -593,6 +597,8 @@ app.put('/api/products/:id', async (req, res) => {
         emptyToNull(department_id),
         emptyToNull(supplier_id),
         emptyToNull(min_stock_level),
+        emptyToNull(storage_location_id),
+        emptyToNull(shelf_location_id),
         req.params.id
       ]
     );
