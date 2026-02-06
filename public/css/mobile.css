@@ -258,6 +258,13 @@ body.mobile {
   display: flex;
 }
 
+/* Lower z-index significantly when Bootstrap modal is open */
+/* Bootstrap modals use z-index 1055+, backdrops 1050+ */
+/* We go to 900 to stay well below everything */
+.barcode-scanner-overlay.modal-open {
+  z-index: 900 !important;
+}
+
 .barcode-scanner-container {
   flex: 1;
   display: flex;
