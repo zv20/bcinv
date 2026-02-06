@@ -2,15 +2,19 @@
  * Barcode Scanner Component
  * Uses html5-qrcode library for camera scanning
  * Optimized for small printed barcodes with visual detection feedback
+ * Features: Flashlight toggle, camera selection, autofocus
  */
 
 class BarcodeScanner {
   constructor() {
     this.scanner = null;
     this.isScanning = false;
-    this.isProcessing = false; // Prevent multiple simultaneous scans
+    this.isProcessing = false;
     this.currentAction = null;
     this.continuousMode = false;
+    this.flashlightOn = false;
+    this.availableCameras = [];
+    this.selectedCameraId = null;
     this.scannerElement = null;
     this.init();
   }
@@ -19,6 +23,20 @@ class BarcodeScanner {
     this.createScannerUI();
     this.createModalUI();
     this.attachEventListeners();
+    this.loadCameraPreference();
+  }
+
+  loadCameraPreference() {
+    // Load last used camera from localStorage
+    const saved = localStorage.getItem('preferredCameraId');
+    if (saved) {
+      this.selectedCameraId = saved;
+    }
+  }
+
+  saveCameraPreference(cameraId) {
+    localStorage.setItem('preferredCameraId', cameraId);
+    this.selectedCameraId = cameraId;
   }
 
   createScannerUI() {
@@ -35,7 +53,24 @@ class BarcodeScanner {
               <h3 class="barcode-scanner-title">Scan Barcode</h3>
               <div class="barcode-scanner-action-label"></div>
             </div>
-            <div class="continuous-toggle">
+          </div>
+
+          <!-- Camera Controls Row -->
+          <div class="scanner-controls">
+            <div class="control-group">
+              <label class="control-label">Camera:</label>
+              <select id="camera-selector" class="control-select">
+                <option value="">Loading...</option>
+              </select>
+            </div>
+            
+            <div class="control-toggles">
+              <label class="toggle-label">
+                <input type="checkbox" id="flashlight-toggle" />
+                <span class="toggle-slider"></span>
+                <span class="toggle-text">💡 Flash</span>
+              </label>
+              
               <label class="toggle-label">
                 <input type="checkbox" id="continuous-scan-toggle" />
                 <span class="toggle-slider"></span>
@@ -77,6 +112,113 @@ class BarcodeScanner {
       <div class="scanner-toast" id="scanner-toast">
         <span id="scanner-toast-message"></span>
       </div>
+
+      <style>
+        .scanner-controls {
+          padding: 12px 16px;
+          background: #f8f9fa;
+          border-bottom: 1px solid #e5e7eb;
+          display: flex;
+          flex-direction: column;
+          gap: 12px;
+        }
+
+        .control-group {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+        }
+
+        .control-label {
+          font-size: 13px;
+          font-weight: 600;
+          color: #374151;
+          white-space: nowrap;
+        }
+
+        .control-select {
+          flex: 1;
+          padding: 6px 10px;
+          border: 1px solid #d1d5db;
+          border-radius: 6px;
+          font-size: 13px;
+          background: white;
+          color: #111827;
+        }
+
+        .control-select:focus {
+          outline: none;
+          border-color: #2563eb;
+          box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+        }
+
+        .control-toggles {
+          display: flex;
+          gap: 16px;
+          justify-content: center;
+        }
+
+        .toggle-label {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          cursor: pointer;
+          user-select: none;
+        }
+
+        .toggle-label input[type="checkbox"] {
+          display: none;
+        }
+
+        .toggle-slider {
+          position: relative;
+          width: 40px;
+          height: 22px;
+          background: #d1d5db;
+          border-radius: 11px;
+          transition: background 0.2s;
+        }
+
+        .toggle-slider::after {
+          content: '';
+          position: absolute;
+          top: 2px;
+          left: 2px;
+          width: 18px;
+          height: 18px;
+          background: white;
+          border-radius: 50%;
+          transition: transform 0.2s;
+        }
+
+        .toggle-label input[type="checkbox"]:checked + .toggle-slider {
+          background: #2563eb;
+        }
+
+        .toggle-label input[type="checkbox"]:checked + .toggle-slider::after {
+          transform: translateX(18px);
+        }
+
+        .toggle-text {
+          font-size: 13px;
+          font-weight: 500;
+          color: #374151;
+        }
+
+        @media (max-width: 480px) {
+          .scanner-controls {
+            padding: 10px 12px;
+          }
+          
+          .control-toggles {
+            gap: 12px;
+          }
+
+          .toggle-text {
+            font-size: 12px;
+          }
+        }
+      </style>
     `;
 
     document.body.insertAdjacentHTML('beforeend', scannerHTML);
@@ -389,7 +531,6 @@ class BarcodeScanner {
       titleEl.textContent = title;
       messageEl.textContent = message;
       
-      // Set default date (today if not provided)
       if (!defaultDate) {
         const today = new Date();
         const year = today.getFullYear();
@@ -400,8 +541,6 @@ class BarcodeScanner {
       
       input.value = defaultDate;
       modal.classList.add('active');
-      
-      // Auto-focus triggers calendar on mobile
       setTimeout(() => input.focus(), 100);
 
       const handleSubmit = () => {
@@ -445,10 +584,8 @@ class BarcodeScanner {
       titleEl.textContent = title;
       messageEl.textContent = message;
       
-      // Clear previous buttons
       optionsContainer.innerHTML = '';
       
-      // Create button elements
       buttons.forEach(button => {
         const btnEl = document.createElement('button');
         btnEl.className = `button-option ${button.style || ''}`;
@@ -534,6 +671,26 @@ class BarcodeScanner {
       });
     }
 
+    // Flashlight toggle
+    const flashToggle = document.getElementById('flashlight-toggle');
+    if (flashToggle) {
+      flashToggle.addEventListener('change', async (e) => {
+        this.flashlightOn = e.target.checked;
+        await this.toggleFlashlight(this.flashlightOn);
+      });
+    }
+
+    // Camera selector
+    const cameraSelector = document.getElementById('camera-selector');
+    if (cameraSelector) {
+      cameraSelector.addEventListener('change', async (e) => {
+        const cameraId = e.target.value;
+        if (cameraId && this.isScanning) {
+          await this.switchCamera(cameraId);
+        }
+      });
+    }
+
     // Manual barcode entry
     const manualInput = document.getElementById('manual-barcode-input');
     const manualSubmit = document.getElementById('manual-barcode-submit');
@@ -562,6 +719,87 @@ class BarcodeScanner {
     document.addEventListener('cameraAction', (e) => {
       this.openScanner(e.detail.action);
     });
+  }
+
+  async toggleFlashlight(on) {
+    if (!this.scanner || !this.isScanning) return;
+
+    try {
+      const track = this.scanner.getRunningTrackCameraCapabilities();
+      if (track && track.torch) {
+        await track.applyConstraints({
+          advanced: [{ torch: on }]
+        });
+        console.log('Flashlight:', on ? 'ON' : 'OFF');
+        this.showToast(on ? '💡 Flashlight ON' : 'Flashlight OFF', 'info');
+      } else {
+        console.log('Flashlight not supported on this device');
+        this.showToast('Flashlight not available', 'warning');
+        // Reset toggle
+        const flashToggle = document.getElementById('flashlight-toggle');
+        if (flashToggle) flashToggle.checked = false;
+      }
+    } catch (err) {
+      console.error('Error toggling flashlight:', err);
+      this.showToast('Could not control flashlight', 'error');
+    }
+  }
+
+  async loadAvailableCameras() {
+    try {
+      if (typeof Html5Qrcode === 'undefined') return;
+      
+      const devices = await Html5Qrcode.getCameras();
+      this.availableCameras = devices;
+      
+      const selector = document.getElementById('camera-selector');
+      if (selector && devices.length > 0) {
+        selector.innerHTML = '';
+        devices.forEach((device, index) => {
+          const option = document.createElement('option');
+          option.value = device.id;
+          // Friendly names for cameras
+          if (device.label) {
+            option.textContent = device.label;
+          } else {
+            option.textContent = `Camera ${index + 1}`;
+          }
+          // Select saved preference or back camera
+          if (this.selectedCameraId === device.id) {
+            option.selected = true;
+          } else if (!this.selectedCameraId && device.label && device.label.toLowerCase().includes('back')) {
+            option.selected = true;
+            this.selectedCameraId = device.id;
+          }
+          selector.appendChild(option);
+        });
+        
+        console.log('Found cameras:', devices.length);
+      }
+    } catch (err) {
+      console.error('Error loading cameras:', err);
+    }
+  }
+
+  async switchCamera(cameraId) {
+    console.log('Switching to camera:', cameraId);
+    
+    try {
+      // Stop current camera
+      if (this.scanner && this.isScanning) {
+        await this.scanner.stop();
+      }
+      
+      // Save preference
+      this.saveCameraPreference(cameraId);
+      
+      // Restart with new camera
+      await this.startCamera(cameraId);
+      this.showToast('Camera switched', 'success');
+    } catch (err) {
+      console.error('Error switching camera:', err);
+      this.showToast('Could not switch camera', 'error');
+    }
   }
 
   showToast(message, type = 'success') {
@@ -597,11 +835,17 @@ class BarcodeScanner {
       actionLabel.textContent = actionNames[action] || 'Scan Item';
     }
 
-    // Reset continuous mode
+    // Reset toggles
     const continuousToggle = document.getElementById('continuous-scan-toggle');
     if (continuousToggle) {
       continuousToggle.checked = false;
       this.continuousMode = false;
+    }
+
+    const flashToggle = document.getElementById('flashlight-toggle');
+    if (flashToggle) {
+      flashToggle.checked = false;
+      this.flashlightOn = false;
     }
 
     // Clear manual input
@@ -613,15 +857,17 @@ class BarcodeScanner {
     // Reset processing flag
     this.isProcessing = false;
 
+    // Load available cameras
+    await this.loadAvailableCameras();
+
     // Start camera
     await this.startCamera();
   }
 
-  async startCamera() {
+  async startCamera(cameraId = null) {
     if (this.isScanning) return;
 
     try {
-      // Import html5-qrcode dynamically
       if (typeof Html5Qrcode === 'undefined') {
         console.error('html5-qrcode library not loaded');
         alert('Scanner library not loaded. Please refresh the page.');
@@ -629,24 +875,32 @@ class BarcodeScanner {
       }
 
       this.scanner = new Html5Qrcode('barcode-scanner-reader', {
-        verbose: false // Disable verbose logging for cleaner console
+        verbose: false
       });
       
-      // Config with qrbox enabled - draws box around detected barcodes
+      // Enhanced config with autofocus
       const config = {
-        fps: 20, // Maximum scan rate
-        qrbox: { width: 300, height: 150 }, // Visual detection box - shows where barcode is detected
+        fps: 20,
+        qrbox: { width: 300, height: 150 },
         disableFlip: false,
-        // Let library auto-detect all barcode formats
+        // Request higher resolution and autofocus
+        videoConstraints: {
+          facingMode: 'environment',
+          focusMode: 'continuous',  // Autofocus
+          advanced: [
+            { focusMode: 'continuous' },
+            { focusDistance: 0 }  // Near focus for close-up barcodes
+          ]
+        },
         experimentalFeatures: {
-          useBarCodeDetectorIfSupported: true // Use native detector if available
+          useBarCodeDetectorIfSupported: true
         }
       };
 
-      // Simple camera constraints - just request back camera
-      const cameraConfig = { facingMode: 'environment' };
+      // Use selected camera or default
+      const cameraConfig = cameraId || this.selectedCameraId || { facingMode: 'environment' };
 
-      console.log('Starting camera with visual detection box...');
+      console.log('Starting camera with autofocus and high resolution...');
 
       await this.scanner.start(
         cameraConfig,
@@ -657,54 +911,29 @@ class BarcodeScanner {
           this.handleScanResult(decodedText);
         },
         (errorMessage) => {
-          // Scanning errors are normal, suppress console spam
+          // Suppress scanning errors
         }
       );
 
       this.isScanning = true;
-      console.log('Camera started with visual detection feedback');
-      this.showToast('Camera ready - Align barcode in box', 'info');
+      console.log('Camera started with autofocus');
+      this.showToast('Camera ready', 'info');
     } catch (err) {
       console.error('Error starting camera:', err);
-      console.error('Error details:', err.message, err.name);
       
-      // More helpful error message
       let errorMsg = 'Unable to access camera. ';
       
       if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
-        errorMsg += 'Please allow camera permissions in your browser settings.';
+        errorMsg += 'Please allow camera permissions.';
       } else if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
-        errorMsg += 'No camera found on this device.';
+        errorMsg += 'No camera found.';
       } else if (err.name === 'NotReadableError' || err.name === 'TrackStartError') {
-        errorMsg += 'Camera is already in use by another app. Please close other apps and try again.';
-      } else if (err.name === 'OverconstrainedError' || err.name === 'ConstraintNotSatisfiedError') {
-        errorMsg += 'Camera settings not supported. Trying alternative...';
-        
-        // Try again with even simpler constraints
-        try {
-          await this.scanner.start(
-            { facingMode: { ideal: 'environment' } },
-            config,
-            (decodedText) => {
-              console.log('Barcode detected:', decodedText);
-              this.handleScanResult(decodedText);
-            },
-            (errorMessage) => {}
-          );
-          this.isScanning = true;
-          console.log('Camera started with fallback settings');
-          this.showToast('Camera started', 'success');
-          return;
-        } catch (fallbackErr) {
-          console.error('Fallback also failed:', fallbackErr);
-          errorMsg = 'Camera not compatible. Please use manual barcode entry below.';
-        }
+        errorMsg += 'Camera in use by another app.';
       } else {
-        errorMsg += 'Please check permissions or use manual entry.';
+        errorMsg += 'Please use manual entry.';
       }
       
       alert(errorMsg);
-      // Keep scanner open so user can use manual entry
     }
   }
 
@@ -723,12 +952,12 @@ class BarcodeScanner {
     this.scanner = null;
     this.currentAction = null;
     this.continuousMode = false;
+    this.flashlightOn = false;
     this.scannerElement.classList.remove('active');
     console.log('Scanner closed');
   }
 
   async handleScanResult(barcode) {
-    // Prevent processing if already handling a scan
     if (this.isProcessing) {
       console.log('Already processing a scan, ignoring...');
       return;
@@ -736,20 +965,15 @@ class BarcodeScanner {
 
     console.log('Processing barcode:', barcode, 'for action:', this.currentAction);
     
-    // Set processing flag immediately
     this.isProcessing = true;
-    
-    // Store action before processing
     const action = this.currentAction;
     const continuous = this.continuousMode;
     
-    // Clear manual input
     const manualInput = document.getElementById('manual-barcode-input');
     if (manualInput) {
       manualInput.value = '';
     }
     
-    // STOP scanner during user interaction (critical for preventing loop)
     if (this.scanner && this.isScanning) {
       try {
         await this.scanner.pause();
@@ -759,7 +983,6 @@ class BarcodeScanner {
       }
     }
 
-    // Process based on action
     try {
       switch(action) {
         case 'add-item':
@@ -778,14 +1001,11 @@ class BarcodeScanner {
           console.error('Unknown action:', action);
       }
       
-      // Reset processing flag after completion
       this.isProcessing = false;
       
-      // If continuous mode is OFF, close scanner
       if (!continuous) {
         await this.closeScanner();
       } else {
-        // Resume scanner for next scan only if continuous mode ON
         if (this.scanner && this.isScanning) {
           try {
             await this.scanner.resume();
@@ -799,7 +1019,6 @@ class BarcodeScanner {
       console.error('Error processing scan:', error);
       this.isProcessing = false;
       
-      // Resume scanner even on error if continuous
       if (continuous && this.scanner && this.isScanning) {
         try {
           await this.scanner.resume();
@@ -814,7 +1033,6 @@ class BarcodeScanner {
     console.log('handleAddItem called with barcode:', barcode);
     
     try {
-      // Check if product exists
       const response = await fetch(`/api/products?search=${encodeURIComponent(barcode)}`);
       
       if (!response.ok) {
@@ -824,7 +1042,6 @@ class BarcodeScanner {
       const data = await response.json();
       console.log('API Response:', data);
       
-      // Handle different response formats
       let products = [];
       if (Array.isArray(data)) {
         products = data;
@@ -837,7 +1054,6 @@ class BarcodeScanner {
       const existingProduct = products.find(p => p.sku === barcode || p.barcode === barcode);
       
       if (existingProduct) {
-        // Product exists - open EDIT modal
         console.log('Product found, opening EDIT modal:', existingProduct);
         this.showToast(`Editing: ${existingProduct.name}`, 'info');
         
@@ -854,7 +1070,6 @@ class BarcodeScanner {
         return;
       }
 
-      // Product doesn't exist, open ADD modal
       console.log('Product not found, opening ADD modal...');
       this.showToast('Product not found - Add new', 'info');
       
@@ -912,7 +1127,6 @@ class BarcodeScanner {
 
       this.showToast(`Found: ${product.name}`, 'success');
       
-      // Navigate to product detail modal
       if (typeof showProducts === 'function') {
         showProducts();
         
@@ -959,12 +1173,10 @@ class BarcodeScanner {
         return;
       }
 
-      // Get existing batches
       const batchResponse = await fetch(`/api/products/${product.id}/batches`);
       const batchData = await batchResponse.json();
       const batches = batchData.batches || [];
       
-      // Ask for expiration date using DATE PICKER
       const expiryDateInput = await this.showDateModal(
         'Adjust Stock',
         `Product: ${product.name}\n\nSelect expiration date:`
@@ -975,17 +1187,14 @@ class BarcodeScanner {
         return;
       }
       
-      // Fixed date normalization - use the input value directly
       const targetDate = expiryDateInput;
       console.log('Target date:', targetDate);
       
       const normalizeDate = (val) => {
         if (!val) return null;
-        // If already in YYYY-MM-DD format, return as-is
         if (typeof val === 'string' && val.match(/^\d{4}-\d{2}-\d{2}$/)) {
           return val;
         }
-        // Otherwise parse and format
         const date = new Date(val);
         if (isNaN(date.getTime())) {
           console.error('Invalid date:', val);
@@ -997,7 +1206,6 @@ class BarcodeScanner {
         return `${year}-${month}-${day}`;
       };
       
-      // Check if batch with this date exists (compare only date part)
       const matchingBatch = batches.find(b => {
         const batchDate = normalizeDate(b.expiry_date);
         console.log('Comparing batch date:', b.expiry_date, '→', batchDate, 'with target:', targetDate);
@@ -1005,7 +1213,6 @@ class BarcodeScanner {
       });
       
       if (matchingBatch) {
-        // Batch exists - adjust it
         const newQty = await this.showInputModal(
           'Adjust Batch',
           `Batch found with expiry ${targetDate}\nCurrent quantity: ${matchingBatch.quantity}\n\nEnter new quantity:`,
@@ -1023,7 +1230,6 @@ class BarcodeScanner {
           'e.g., Inventory count'
         );
         
-        // Call adjust API
         const adjustResponse = await fetch('/api/stock/adjust', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -1041,7 +1247,6 @@ class BarcodeScanner {
           throw new Error('Failed to adjust stock');
         }
       } else {
-        // No batch with this date - create new batch
         const qty = await this.showInputModal(
           'Create New Batch',
           `No batch found with expiry ${targetDate}\n\nEnter quantity for new batch:`,
@@ -1053,7 +1258,6 @@ class BarcodeScanner {
           return;
         }
         
-        // Create new batch
         const createResponse = await fetch(`/api/products/${product.id}/batches`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -1104,7 +1308,6 @@ class BarcodeScanner {
         return;
       }
 
-      // Ask if expired or damaged using BUTTON SELECTOR
       const reason = await this.showButtonModal(
         'Discard Reason',
         `Product: ${product.name}\n\nWhy are you discarding this item?`,
@@ -1121,7 +1324,6 @@ class BarcodeScanner {
       
       const reasonText = reason === '1' ? 'Expired' : 'Damaged';
       
-      // Ask for date using DATE PICKER
       const expiryDateInput = await this.showDateModal(
         'Discard Date',
         `Select ${reasonText.toLowerCase()} date:`
@@ -1132,17 +1334,14 @@ class BarcodeScanner {
         return;
       }
       
-      // Fixed date normalization - use the input value directly
       const targetDate = expiryDateInput;
       console.log('Target date:', targetDate);
       
       const normalizeDate = (val) => {
         if (!val) return null;
-        // If already in YYYY-MM-DD format, return as-is
         if (typeof val === 'string' && val.match(/^\d{4}-\d{2}-\d{2}$/)) {
           return val;
         }
-        // Otherwise parse and format
         const date = new Date(val);
         if (isNaN(date.getTime())) {
           console.error('Invalid date:', val);
@@ -1154,12 +1353,10 @@ class BarcodeScanner {
         return `${year}-${month}-${day}`;
       };
       
-      // Get existing batches
       const batchResponse = await fetch(`/api/products/${product.id}/batches`);
       const batchData = await batchResponse.json();
       const batches = batchData.batches || [];
       
-      // Find batch with matching date (compare only date part)
       const matchingBatch = batches.find(b => {
         const batchDate = normalizeDate(b.expiry_date);
         console.log('Comparing batch date:', b.expiry_date, '→', batchDate, 'with target:', targetDate);
@@ -1167,7 +1364,6 @@ class BarcodeScanner {
       });
       
       if (matchingBatch) {
-        // Batch exists - discard from it
         const qty = await this.showInputModal(
           'Discard Quantity',
           `Batch found with date ${targetDate}\nCurrent quantity: ${matchingBatch.quantity}\n\nEnter quantity to discard:`,
@@ -1179,7 +1375,6 @@ class BarcodeScanner {
           return;
         }
         
-        // Call discard API
         const discardResponse = await fetch('/api/stock/discard', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -1197,7 +1392,6 @@ class BarcodeScanner {
           throw new Error('Failed to discard stock');
         }
       } else {
-        // No batch found - create negative batch for tracking
         const qty = await this.showInputModal(
           'Track Discarded Items',
           `No batch with date ${targetDate}\n\nThis will create a negative batch for tracking.\n\nEnter quantity discarded:`,
@@ -1209,7 +1403,6 @@ class BarcodeScanner {
           return;
         }
         
-        // Create batch with negative quantity
         const createResponse = await fetch(`/api/products/${product.id}/batches`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
