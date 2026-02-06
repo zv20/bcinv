@@ -1,6 +1,7 @@
 /**
  * Barcode Scanner Component
  * Uses html5-qrcode library for camera scanning
+ * Optimized for small printed barcodes
  */
 
 class BarcodeScanner {
@@ -44,6 +45,10 @@ class BarcodeScanner {
           </div>
           
           <div id="barcode-scanner-reader" class="barcode-scanner-reader"></div>
+          
+          <div class="barcode-scanner-tips">
+            <p style="font-size: 12px; color: #666; margin: 8px 0;">💡 Tips: Hold phone 4-8 inches from barcode • Ensure good lighting • Keep steady</p>
+          </div>
           
           <div class="barcode-scanner-instructions">
             <p>Position barcode within the frame</p>
@@ -625,14 +630,46 @@ class BarcodeScanner {
 
       this.scanner = new Html5Qrcode('barcode-scanner-reader');
       
+      // Optimized config for SMALL printed barcodes
       const config = {
-        fps: 10,
-        qrbox: { width: 250, height: 150 },
-        aspectRatio: 1.7777778
+        fps: 15, // Increased from 10 to 15 for faster scanning
+        qrbox: function(viewfinderWidth, viewfinderHeight) {
+          // Dynamic box sizing - smaller for better small barcode detection
+          const minEdgePercentage = 0.6; // Reduced from default to allow smaller detection area
+          const minEdgeSize = Math.min(viewfinderWidth, viewfinderHeight);
+          const qrboxSize = Math.floor(minEdgeSize * minEdgePercentage);
+          return {
+            width: qrboxSize,
+            height: Math.floor(qrboxSize * 0.5) // Wider aspect ratio for horizontal barcodes
+          };
+        },
+        aspectRatio: 1.7777778,
+        // Advanced settings for better small barcode detection
+        disableFlip: false, // Allow horizontal flip for better detection
+        rememberLastUsedCamera: true,
+        // Supported formats - explicitly enable barcode formats
+        formatsToSupport: [
+          Html5QrcodeSupportedFormats.UPC_A,
+          Html5QrcodeSupportedFormats.UPC_E,
+          Html5QrcodeSupportedFormats.EAN_13,
+          Html5QrcodeSupportedFormats.EAN_8,
+          Html5QrcodeSupportedFormats.CODE_128,
+          Html5QrcodeSupportedFormats.CODE_39,
+          Html5QrcodeSupportedFormats.QR_CODE
+        ]
+      };
+
+      // Request camera with optimal constraints for barcode scanning
+      const cameraConstraints = {
+        facingMode: 'environment',
+        advanced: [
+          { focusMode: 'continuous' }, // Continuous autofocus
+          { zoom: 1.5 } // Slight zoom for closer focus on small barcodes
+        ]
       };
 
       await this.scanner.start(
-        { facingMode: 'environment' },
+        cameraConstraints,
         config,
         (decodedText) => {
           console.log('Barcode detected:', decodedText);
@@ -644,7 +681,8 @@ class BarcodeScanner {
       );
 
       this.isScanning = true;
-      console.log('Camera started successfully');
+      console.log('Camera started successfully with optimized settings for small barcodes');
+      this.showToast('Hold phone 4-8 inches from barcode', 'info');
     } catch (err) {
       console.error('Error starting camera:', err);
       alert('Unable to access camera. Please check permissions or use manual entry.');
