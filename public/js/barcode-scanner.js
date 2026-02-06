@@ -644,32 +644,17 @@ class BarcodeScanner {
           };
         },
         aspectRatio: 1.7777778,
-        // Advanced settings for better small barcode detection
         disableFlip: false, // Allow horizontal flip for better detection
-        rememberLastUsedCamera: true,
-        // Supported formats - explicitly enable barcode formats
-        formatsToSupport: [
-          Html5QrcodeSupportedFormats.UPC_A,
-          Html5QrcodeSupportedFormats.UPC_E,
-          Html5QrcodeSupportedFormats.EAN_13,
-          Html5QrcodeSupportedFormats.EAN_8,
-          Html5QrcodeSupportedFormats.CODE_128,
-          Html5QrcodeSupportedFormats.CODE_39,
-          Html5QrcodeSupportedFormats.QR_CODE
-        ]
+        rememberLastUsedCamera: true
       };
 
-      // Request camera with optimal constraints for barcode scanning
-      const cameraConstraints = {
-        facingMode: 'environment',
-        advanced: [
-          { focusMode: 'continuous' }, // Continuous autofocus
-          { zoom: 1.5 } // Slight zoom for closer focus on small barcodes
-        ]
-      };
+      // Simple camera constraints - just request back camera
+      const cameraConfig = { facingMode: 'environment' };
+
+      console.log('Requesting camera access...');
 
       await this.scanner.start(
-        cameraConstraints,
+        cameraConfig,
         config,
         (decodedText) => {
           console.log('Barcode detected:', decodedText);
@@ -685,7 +670,45 @@ class BarcodeScanner {
       this.showToast('Hold phone 4-8 inches from barcode', 'info');
     } catch (err) {
       console.error('Error starting camera:', err);
-      alert('Unable to access camera. Please check permissions or use manual entry.');
+      console.error('Error details:', err.message, err.name);
+      
+      // More helpful error message
+      let errorMsg = 'Unable to access camera. ';
+      
+      if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+        errorMsg += 'Please allow camera permissions in your browser settings.';
+      } else if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
+        errorMsg += 'No camera found on this device.';
+      } else if (err.name === 'NotReadableError' || err.name === 'TrackStartError') {
+        errorMsg += 'Camera is already in use by another app. Please close other apps and try again.';
+      } else if (err.name === 'OverconstrainedError' || err.name === 'ConstraintNotSatisfiedError') {
+        errorMsg += 'Camera settings not supported. Trying alternative...';
+        
+        // Try again with even simpler constraints
+        try {
+          await this.scanner.start(
+            { facingMode: { ideal: 'environment' } },
+            config,
+            (decodedText) => {
+              console.log('Barcode detected:', decodedText);
+              this.handleScanResult(decodedText);
+            },
+            (errorMessage) => {}
+          );
+          this.isScanning = true;
+          console.log('Camera started with fallback settings');
+          this.showToast('Camera started', 'success');
+          return;
+        } catch (fallbackErr) {
+          console.error('Fallback also failed:', fallbackErr);
+          errorMsg = 'Camera not compatible. Please use manual barcode entry below.';
+        }
+      } else {
+        errorMsg += 'Please check permissions or use manual entry.';
+      }
+      
+      alert(errorMsg);
+      // Keep scanner open so user can use manual entry
     }
   }
 
