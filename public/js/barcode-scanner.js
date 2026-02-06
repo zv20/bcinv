@@ -2,7 +2,7 @@
  * Barcode Scanner Component
  * Uses html5-qrcode library for camera scanning
  * Optimized for small printed barcodes with visual detection feedback
- * Features: Flashlight toggle, autofocus
+ * Features: Flashlight toggle, autofocus, dual-location support
  */
 
 class BarcodeScanner {
@@ -14,6 +14,7 @@ class BarcodeScanner {
     this.continuousMode = false;
     this.flashlightOn = false;
     this.scannerElement = null;
+    this.locations = [];
     this.init();
   }
 
@@ -21,6 +22,20 @@ class BarcodeScanner {
     this.createScannerUI();
     this.createModalUI();
     this.attachEventListeners();
+    this.loadLocations();
+  }
+
+  async loadLocations() {
+    try {
+      const response = await fetch('/api/locations');
+      if (response.ok) {
+        const data = await response.json();
+        this.locations = data.locations || data || [];
+        console.log('Loaded locations:', this.locations);
+      }
+    } catch (err) {
+      console.error('Error loading locations:', err);
+    }
   }
 
   createScannerUI() {
@@ -198,6 +213,25 @@ class BarcodeScanner {
         </div>
       </div>
 
+      <!-- Location Selector Modal -->
+      <div class="scanner-modal-overlay" id="scanner-location-modal">
+        <div class="scanner-modal">
+          <div class="scanner-modal-header">
+            <h3 id="scanner-location-title">Select Location</h3>
+          </div>
+          <div class="scanner-modal-body">
+            <p id="scanner-location-message"></p>
+            <select id="scanner-location-select" class="form-control">
+              <option value="">Select a location</option>
+            </select>
+          </div>
+          <div class="scanner-modal-footer">
+            <button class="btn btn-secondary" id="scanner-location-cancel">Cancel</button>
+            <button class="btn btn-primary" id="scanner-location-submit">OK</button>
+          </div>
+        </div>
+      </div>
+
       <!-- Button Selection Modal -->
       <div class="scanner-modal-overlay" id="scanner-button-modal">
         <div class="scanner-modal">
@@ -311,7 +345,8 @@ class BarcodeScanner {
         box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
       }
 
-      .scanner-modal-body input[type="date"] {
+      .scanner-modal-body input[type="date"],
+      .scanner-modal-body select {
         min-height: 44px;
         cursor: pointer;
       }
@@ -507,6 +542,99 @@ class BarcodeScanner {
       submitBtn.addEventListener('click', handleSubmit);
       cancelBtn.addEventListener('click', handleCancel);
       input.addEventListener('keypress', handleKeyPress);
+    });
+  }
+
+  showLocationModal(title, message, product = null) {
+    return new Promise((resolve) => {
+      const modal = document.getElementById('scanner-location-modal');
+      const titleEl = document.getElementById('scanner-location-title');
+      const messageEl = document.getElementById('scanner-location-message');
+      const select = document.getElementById('scanner-location-select');
+      const submitBtn = document.getElementById('scanner-location-submit');
+      const cancelBtn = document.getElementById('scanner-location-cancel');
+
+      titleEl.textContent = title;
+      messageEl.textContent = message;
+      
+      // Build options with smart defaults
+      select.innerHTML = '<option value="">Select a location</option>';
+      
+      // Add product's default locations first (if they exist)
+      const addedLocations = new Set();
+      
+      if (product) {
+        if (product.storage_location_id && product.storage_location_name) {
+          const option = document.createElement('option');
+          option.value = product.storage_location_id;
+          option.textContent = `📦 ${product.storage_location_name} (Storage)`;
+          option.selected = true; // Default to storage location
+          select.appendChild(option);
+          addedLocations.add(product.storage_location_id);
+        }
+        
+        if (product.shelf_location_id && product.shelf_location_name) {
+          const option = document.createElement('option');
+          option.value = product.shelf_location_id;
+          option.textContent = `🏪 ${product.shelf_location_name} (Shelf)`;
+          select.appendChild(option);
+          addedLocations.add(product.shelf_location_id);
+          
+          // If no storage location, default to shelf
+          if (!product.storage_location_id) {
+            option.selected = true;
+          }
+        }
+        
+        // Add separator if we added any product locations
+        if (addedLocations.size > 0) {
+          const separator = document.createElement('option');
+          separator.disabled = true;
+          separator.textContent = '───────────────';
+          select.appendChild(separator);
+        }
+      }
+      
+      // Add all other locations
+      this.locations.forEach(loc => {
+        if (!addedLocations.has(loc.id)) {
+          const option = document.createElement('option');
+          option.value = loc.id;
+          option.textContent = loc.name;
+          select.appendChild(option);
+        }
+      });
+      
+      modal.classList.add('active');
+      setTimeout(() => select.focus(), 100);
+
+      const handleSubmit = () => {
+        const value = select.value;
+        modal.classList.remove('active');
+        cleanup();
+        resolve(value || null);
+      };
+
+      const handleCancel = () => {
+        modal.classList.remove('active');
+        cleanup();
+        resolve(null);
+      };
+
+      const handleKeyPress = (e) => {
+        if (e.key === 'Enter') handleSubmit();
+        if (e.key === 'Escape') handleCancel();
+      };
+
+      const cleanup = () => {
+        submitBtn.removeEventListener('click', handleSubmit);
+        cancelBtn.removeEventListener('click', handleCancel);
+        select.removeEventListener('keypress', handleKeyPress);
+      };
+
+      submitBtn.addEventListener('click', handleSubmit);
+      cancelBtn.addEventListener('click', handleCancel);
+      select.addEventListener('keypress', handleKeyPress);
     });
   }
 
@@ -1101,6 +1229,7 @@ class BarcodeScanner {
           throw new Error('Failed to adjust stock');
         }
       } else {
+        // No matching batch - create new batch with location selector
         const qty = await this.showInputModal(
           'Create New Batch',
           `No batch found with expiry ${targetDate}\n\nEnter quantity for new batch:`,
@@ -1112,12 +1241,29 @@ class BarcodeScanner {
           return;
         }
         
+        // Get product details with location info
+        const productDetailResponse = await fetch(`/api/products/${product.id}`);
+        const productDetail = await productDetailResponse.json();
+        
+        // Show location selector with product's default locations
+        const locationId = await this.showLocationModal(
+          'Select Location',
+          `Where is this batch stored?`,
+          productDetail
+        );
+        
+        if (locationId === null) {
+          this.showToast('Cancelled', 'info');
+          return;
+        }
+        
         const createResponse = await fetch(`/api/products/${product.id}/batches`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             quantity: parseInt(qty, 10),
             expiration_date: targetDate,
+            location_id: locationId || null,
             notes: `Created via scan - Barcode: ${barcode}`
           })
         });
@@ -1257,12 +1403,29 @@ class BarcodeScanner {
           return;
         }
         
+        // Get product details with location info
+        const productDetailResponse = await fetch(`/api/products/${product.id}`);
+        const productDetail = await productDetailResponse.json();
+        
+        // Show location selector for discard tracking
+        const locationId = await this.showLocationModal(
+          'Select Location',
+          `Where was this item located?`,
+          productDetail
+        );
+        
+        if (locationId === null) {
+          this.showToast('Cancelled', 'info');
+          return;
+        }
+        
         const createResponse = await fetch(`/api/products/${product.id}/batches`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             quantity: -parseInt(qty, 10),
             expiration_date: targetDate,
+            location_id: locationId || null,
             notes: `${reasonText} - Never logged. Barcode: ${barcode}`,
             batch_number: `DISCARD-${Date.now()}`
           })

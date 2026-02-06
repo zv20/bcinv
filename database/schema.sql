@@ -50,12 +50,17 @@ CREATE TABLE products (
     cost_price DECIMAL(10,2),
     department_id INTEGER REFERENCES departments(id) ON DELETE SET NULL,
     supplier_id INTEGER REFERENCES suppliers(id) ON DELETE SET NULL,
+    storage_location_id INTEGER REFERENCES locations(id) ON DELETE SET NULL,
+    shelf_location_id INTEGER REFERENCES locations(id) ON DELETE SET NULL,
     items_per_case INTEGER,
     price_per_case DECIMAL(10,2),
     min_stock_level INTEGER DEFAULT 10,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
+COMMENT ON COLUMN products.storage_location_id IS 'Primary storage location (warehouse, backroom)';
+COMMENT ON COLUMN products.shelf_location_id IS 'Display/sales location (retail floor, shelf)';
 
 -- Stock Batches
 CREATE TABLE stock_batches (
@@ -89,6 +94,8 @@ CREATE TABLE audit_log (
 -- Indexes for performance
 CREATE INDEX idx_products_department ON products(department_id);
 CREATE INDEX idx_products_supplier ON products(supplier_id);
+CREATE INDEX idx_products_storage_location ON products(storage_location_id);
+CREATE INDEX idx_products_shelf_location ON products(shelf_location_id);
 CREATE INDEX idx_products_sku ON products(sku);
 CREATE INDEX idx_products_barcode ON products(barcode);
 CREATE INDEX idx_products_category ON products(category);
