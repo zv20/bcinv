@@ -47,7 +47,7 @@ class BarcodeScanner {
           <div id="barcode-scanner-reader" class="barcode-scanner-reader"></div>
           
           <div class="barcode-scanner-tips">
-            <p style="font-size: 12px; color: #666; margin: 8px 0;">💡 Tips: Hold phone 4-8 inches from barcode • Ensure good lighting • Keep steady</p>
+            <p style="font-size: 12px; color: #666; margin: 8px 0;">💡 Tips: Hold phone 6-10 inches away • Bright light • Align barcode horizontally • Keep very steady</p>
           </div>
           
           <div class="barcode-scanner-instructions">
@@ -628,46 +628,46 @@ class BarcodeScanner {
         return;
       }
 
-      this.scanner = new Html5Qrcode('barcode-scanner-reader');
+      this.scanner = new Html5Qrcode('barcode-scanner-reader', {
+        verbose: true // Enable verbose logging for debugging
+      });
       
-      // Optimized config for SMALL printed barcodes
+      // AGGRESSIVE config for VERY SMALL printed barcodes
+      // Remove qrbox to scan entire frame - better for small barcodes
       const config = {
-        fps: 15, // Increased from 10 to 15 for faster scanning
-        qrbox: function(viewfinderWidth, viewfinderHeight) {
-          // Dynamic box sizing - smaller for better small barcode detection
-          const minEdgePercentage = 0.6; // Reduced from default to allow smaller detection area
-          const minEdgeSize = Math.min(viewfinderWidth, viewfinderHeight);
-          const qrboxSize = Math.floor(minEdgeSize * minEdgePercentage);
-          return {
-            width: qrboxSize,
-            height: Math.floor(qrboxSize * 0.5) // Wider aspect ratio for horizontal barcodes
-          };
-        },
-        aspectRatio: 1.7777778,
-        disableFlip: false, // Allow horizontal flip for better detection
-        rememberLastUsedCamera: true
+        fps: 20, // Maximum scan rate
+        // NO qrbox - scan entire frame for better small barcode detection
+        disableFlip: false,
+        // Let library auto-detect all barcode formats (more compatible)
+        experimentalFeatures: {
+          useBarCodeDetectorIfSupported: true // Use native detector if available
+        }
       };
 
       // Simple camera constraints - just request back camera
       const cameraConfig = { facingMode: 'environment' };
 
-      console.log('Requesting camera access...');
+      console.log('Requesting camera access with aggressive barcode detection...');
 
       await this.scanner.start(
         cameraConfig,
         config,
-        (decodedText) => {
-          console.log('Barcode detected:', decodedText);
+        (decodedText, decodedResult) => {
+          console.log('✅ Barcode detected!', decodedText);
+          console.log('Format:', decodedResult.result.format);
           this.handleScanResult(decodedText);
         },
         (errorMessage) => {
-          // Scanning errors are normal, ignore them
+          // Scanning errors are normal, only log occasionally
+          if (Math.random() < 0.01) { // Log 1% of errors to avoid spam
+            console.log('Scanning...', errorMessage);
+          }
         }
       );
 
       this.isScanning = true;
-      console.log('Camera started successfully with optimized settings for small barcodes');
-      this.showToast('Hold phone 4-8 inches from barcode', 'info');
+      console.log('Camera started - scanning entire frame at 20 FPS');
+      this.showToast('Camera ready - Hold 6-10 inches away', 'info');
     } catch (err) {
       console.error('Error starting camera:', err);
       console.error('Error details:', err.message, err.name);
