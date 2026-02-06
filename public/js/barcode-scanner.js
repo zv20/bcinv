@@ -1,18 +1,17 @@
 /**
- * Barcode Scanner Component - ZXing Implementation
- * Using ZXing library directly like Grocy does
- * Optimized for small printed grocery store barcodes
+ * Barcode Scanner Component
+ * Uses html5-qrcode library for camera scanning
+ * Optimized for small printed barcodes
  */
 
 class BarcodeScanner {
   constructor() {
     this.scanner = null;
     this.isScanning = false;
-    this.isProcessing = false;
+    this.isProcessing = false; // Prevent multiple simultaneous scans
     this.currentAction = null;
     this.continuousMode = false;
     this.scannerElement = null;
-    this.videoElement = null;
     this.init();
   }
 
@@ -45,14 +44,10 @@ class BarcodeScanner {
             </div>
           </div>
           
-          <div class="barcode-scanner-video-container">
-            <video id="barcode-scanner-video" autoplay playsinline></video>
-          </div>
+          <div id="barcode-scanner-reader" class="barcode-scanner-reader"></div>
           
           <div class="barcode-scanner-tips">
-            <p style="font-size: 12px; color: #666; margin: 8px 0;">
-              💡 Tips: Hold 6-10 inches away • Bright light • Keep very steady • Align barcode horizontally
-            </p>
+            <p style="font-size: 12px; color: #666; margin: 8px 0;">💡 Tips: Hold phone 6-10 inches away • Bright light • Align barcode horizontally • Keep very steady</p>
           </div>
           
           <div class="barcode-scanner-instructions">
@@ -86,7 +81,6 @@ class BarcodeScanner {
 
     document.body.insertAdjacentHTML('beforeend', scannerHTML);
     this.scannerElement = document.querySelector('.barcode-scanner-overlay');
-    this.videoElement = document.getElementById('barcode-scanner-video');
   }
 
   createModalUI() {
@@ -395,6 +389,7 @@ class BarcodeScanner {
       titleEl.textContent = title;
       messageEl.textContent = message;
       
+      // Set default date (today if not provided)
       if (!defaultDate) {
         const today = new Date();
         const year = today.getFullYear();
@@ -405,6 +400,8 @@ class BarcodeScanner {
       
       input.value = defaultDate;
       modal.classList.add('active');
+      
+      // Auto-focus triggers calendar on mobile
       setTimeout(() => input.focus(), 100);
 
       const handleSubmit = () => {
@@ -447,8 +444,11 @@ class BarcodeScanner {
 
       titleEl.textContent = title;
       messageEl.textContent = message;
+      
+      // Clear previous buttons
       optionsContainer.innerHTML = '';
       
+      // Create button elements
       buttons.forEach(button => {
         const btnEl = document.createElement('button');
         btnEl.className = `button-option ${button.style || ''}`;
@@ -513,16 +513,19 @@ class BarcodeScanner {
   }
 
   attachEventListeners() {
+    // Close button
     const closeBtn = document.querySelector('.barcode-scanner-close');
     if (closeBtn) {
       closeBtn.addEventListener('click', () => this.closeScanner());
     }
 
+    // Done button
     const doneBtn = document.getElementById('scanner-done-btn');
     if (doneBtn) {
       doneBtn.addEventListener('click', () => this.closeScanner());
     }
 
+    // Continuous mode toggle
     const continuousToggle = document.getElementById('continuous-scan-toggle');
     if (continuousToggle) {
       continuousToggle.addEventListener('change', (e) => {
@@ -531,6 +534,7 @@ class BarcodeScanner {
       });
     }
 
+    // Manual barcode entry
     const manualInput = document.getElementById('manual-barcode-input');
     const manualSubmit = document.getElementById('manual-barcode-submit');
     
@@ -554,6 +558,7 @@ class BarcodeScanner {
       });
     }
 
+    // Listen for camera action events
     document.addEventListener('cameraAction', (e) => {
       this.openScanner(e.detail.action);
     });
@@ -578,8 +583,9 @@ class BarcodeScanner {
     this.currentAction = action;
     this.scannerElement.classList.add('active');
     
-    console.log('Opening ZXing scanner for action:', action);
+    console.log('Opening scanner for action:', action);
     
+    // Update action label
     const actionLabel = document.querySelector('.barcode-scanner-action-label');
     const actionNames = {
       'add-item': 'Add/Edit Product',
@@ -591,18 +597,23 @@ class BarcodeScanner {
       actionLabel.textContent = actionNames[action] || 'Scan Item';
     }
 
+    // Reset continuous mode
     const continuousToggle = document.getElementById('continuous-scan-toggle');
     if (continuousToggle) {
       continuousToggle.checked = false;
       this.continuousMode = false;
     }
 
+    // Clear manual input
     const manualInput = document.getElementById('manual-barcode-input');
     if (manualInput) {
       manualInput.value = '';
     }
 
+    // Reset processing flag
     this.isProcessing = false;
+
+    // Start camera
     await this.startCamera();
   }
 
@@ -610,73 +621,102 @@ class BarcodeScanner {
     if (this.isScanning) return;
 
     try {
-      // Check if ZXing is loaded
-      if (typeof ZXing === 'undefined') {
-        throw new Error('ZXing library not loaded');
+      // Import html5-qrcode dynamically
+      if (typeof Html5Qrcode === 'undefined') {
+        console.error('html5-qrcode library not loaded');
+        alert('Scanner library not loaded. Please refresh the page.');
+        return;
       }
 
-      // Initialize ZXing scanner with specific format hints (like Grocy)
-      const hints = new Map();
-      const formats = [
-        ZXing.BarcodeFormat.EAN_8,
-        ZXing.BarcodeFormat.EAN_13,
-        ZXing.BarcodeFormat.CODE_39,
-        ZXing.BarcodeFormat.CODE_128,
-        ZXing.BarcodeFormat.QR_CODE
-      ];
-      hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, formats);
+      this.scanner = new Html5Qrcode('barcode-scanner-reader', {
+        verbose: true // Enable verbose logging for debugging
+      });
       
-      this.scanner = new ZXing.BrowserMultiFormatReader(hints);
+      // AGGRESSIVE config for VERY SMALL printed barcodes
+      // Remove qrbox to scan entire frame - better for small barcodes
+      const config = {
+        fps: 20, // Maximum scan rate
+        // NO qrbox - scan entire frame for better small barcode detection
+        disableFlip: false,
+        // Let library auto-detect all barcode formats (more compatible)
+        experimentalFeatures: {
+          useBarCodeDetectorIfSupported: true // Use native detector if available
+        }
+      };
 
-      console.log('✅ ZXing scanner initialized with formats:', formats.map(f => f));
-      console.log('Starting camera...');
+      // Simple camera constraints - just request back camera
+      const cameraConfig = { facingMode: 'environment' };
 
-      // Start decoding from video device
-      await this.scanner.decodeFromVideoDevice(
-        undefined, // Let browser choose camera
-        this.videoElement,
-        (result, error) => {
-          if (error) {
-            // Scanning errors are normal, ignore
-            return;
-          }
+      console.log('Requesting camera access with aggressive barcode detection...');
 
-          if (result) {
-            console.log('✅ Barcode detected:', result.getText());
-            console.log('Format:', result.getBarcodeFormat());
-            this.handleScanResult(result.getText());
+      await this.scanner.start(
+        cameraConfig,
+        config,
+        (decodedText, decodedResult) => {
+          console.log('✅ Barcode detected!', decodedText);
+          console.log('Format:', decodedResult.result.format);
+          this.handleScanResult(decodedText);
+        },
+        (errorMessage) => {
+          // Scanning errors are normal, only log occasionally
+          if (Math.random() < 0.01) { // Log 1% of errors to avoid spam
+            console.log('Scanning...', errorMessage);
           }
         }
       );
 
       this.isScanning = true;
-      console.log('✅ ZXing camera started successfully');
-      this.showToast('Camera ready - Position barcode in view', 'info');
-
+      console.log('Camera started - scanning entire frame at 20 FPS');
+      this.showToast('Camera ready - Hold 6-10 inches away', 'info');
     } catch (err) {
-      console.error('❌ Error starting camera:', err);
+      console.error('Error starting camera:', err);
+      console.error('Error details:', err.message, err.name);
       
+      // More helpful error message
       let errorMsg = 'Unable to access camera. ';
       
-      if (err.name === 'NotAllowedError' || err.message.includes('permission')) {
+      if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
         errorMsg += 'Please allow camera permissions in your browser settings.';
-      } else if (err.name === 'NotFoundError' || err.message.includes('camera')) {
+      } else if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
         errorMsg += 'No camera found on this device.';
-      } else if (err.message.includes('https')) {
-        errorMsg += 'Camera requires secure connection (HTTPS).';
+      } else if (err.name === 'NotReadableError' || err.name === 'TrackStartError') {
+        errorMsg += 'Camera is already in use by another app. Please close other apps and try again.';
+      } else if (err.name === 'OverconstrainedError' || err.name === 'ConstraintNotSatisfiedError') {
+        errorMsg += 'Camera settings not supported. Trying alternative...';
+        
+        // Try again with even simpler constraints
+        try {
+          await this.scanner.start(
+            { facingMode: { ideal: 'environment' } },
+            config,
+            (decodedText) => {
+              console.log('Barcode detected:', decodedText);
+              this.handleScanResult(decodedText);
+            },
+            (errorMessage) => {}
+          );
+          this.isScanning = true;
+          console.log('Camera started with fallback settings');
+          this.showToast('Camera started', 'success');
+          return;
+        } catch (fallbackErr) {
+          console.error('Fallback also failed:', fallbackErr);
+          errorMsg = 'Camera not compatible. Please use manual barcode entry below.';
+        }
       } else {
-        errorMsg += err.message || 'Please use manual entry below.';
+        errorMsg += 'Please check permissions or use manual entry.';
       }
       
       alert(errorMsg);
+      // Keep scanner open so user can use manual entry
     }
   }
 
   async closeScanner() {
     if (this.scanner && this.isScanning) {
       try {
-        this.scanner.reset();
-        console.log('Scanner stopped');
+        await this.scanner.stop();
+        this.scanner.clear();
       } catch (err) {
         console.error('Error stopping camera:', err);
       }
@@ -688,35 +728,42 @@ class BarcodeScanner {
     this.currentAction = null;
     this.continuousMode = false;
     this.scannerElement.classList.remove('active');
+    console.log('Scanner closed');
   }
 
   async handleScanResult(barcode) {
+    // Prevent processing if already handling a scan
     if (this.isProcessing) {
-      console.log('Already processing, ignoring...');
+      console.log('Already processing a scan, ignoring...');
       return;
     }
 
-    console.log('Processing barcode:', barcode);
+    console.log('Processing barcode:', barcode, 'for action:', this.currentAction);
+    
+    // Set processing flag immediately
     this.isProcessing = true;
     
+    // Store action before processing
     const action = this.currentAction;
     const continuous = this.continuousMode;
     
+    // Clear manual input
     const manualInput = document.getElementById('manual-barcode-input');
     if (manualInput) {
       manualInput.value = '';
     }
     
-    // Stop scanner during processing
+    // STOP scanner during user interaction (critical for preventing loop)
     if (this.scanner && this.isScanning) {
       try {
-        this.scanner.reset();
-        this.isScanning = false;
+        await this.scanner.pause();
+        console.log('Scanner paused for user interaction');
       } catch (err) {
         console.error('Error pausing scanner:', err);
       }
     }
 
+    // Process based on action
     try {
       switch(action) {
         case 'add-item':
@@ -735,57 +782,94 @@ class BarcodeScanner {
           console.error('Unknown action:', action);
       }
       
+      // Reset processing flag after completion
       this.isProcessing = false;
       
+      // If continuous mode is OFF, close scanner
       if (!continuous) {
         await this.closeScanner();
       } else {
-        // Restart scanner for continuous mode
-        await this.startCamera();
+        // Resume scanner for next scan only if continuous mode ON
+        if (this.scanner && this.isScanning) {
+          try {
+            await this.scanner.resume();
+            console.log('Scanner resumed for continuous mode');
+          } catch (err) {
+            console.error('Error resuming scanner:', err);
+          }
+        }
       }
     } catch (error) {
       console.error('Error processing scan:', error);
       this.isProcessing = false;
       
-      if (continuous) {
-        await this.startCamera();
+      // Resume scanner even on error if continuous
+      if (continuous && this.scanner && this.isScanning) {
+        try {
+          await this.scanner.resume();
+        } catch (err) {
+          console.error('Error resuming scanner:', err);
+        }
       }
     }
   }
 
   async handleAddItem(barcode) {
-    console.log('handleAddItem:', barcode);
+    console.log('handleAddItem called with barcode:', barcode);
     
     try {
+      // Check if product exists
       const response = await fetch(`/api/products?search=${encodeURIComponent(barcode)}`);
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
       
       const data = await response.json();
+      console.log('API Response:', data);
+      
+      // Handle different response formats
       let products = [];
-      if (Array.isArray(data)) products = data;
-      else if (data.products) products = data.products;
-      else if (data.data) products = data.data;
+      if (Array.isArray(data)) {
+        products = data;
+      } else if (data.products && Array.isArray(data.products)) {
+        products = data.products;
+      } else if (data.data && Array.isArray(data.data)) {
+        products = data.data;
+      }
       
       const existingProduct = products.find(p => p.sku === barcode || p.barcode === barcode);
       
       if (existingProduct) {
-        console.log('Product found, opening EDIT modal');
+        // Product exists - open EDIT modal
+        console.log('Product found, opening EDIT modal:', existingProduct);
         this.showToast(`Editing: ${existingProduct.name}`, 'info');
         
-        if (typeof showProducts === 'function') showProducts();
+        if (typeof showProducts === 'function') {
+          showProducts();
+        }
+        
         setTimeout(() => {
-          if (typeof editProduct === 'function') editProduct(existingProduct);
+          if (typeof editProduct === 'function') {
+            editProduct(existingProduct);
+          }
         }, 300);
+        
         return;
       }
 
-      console.log('Product not found, opening ADD modal');
+      // Product doesn't exist, open ADD modal
+      console.log('Product not found, opening ADD modal...');
       this.showToast('Product not found - Add new', 'info');
       
-      if (typeof showProducts === 'function') showProducts();
+      if (typeof showProducts === 'function') {
+        showProducts();
+      }
+      
       setTimeout(async () => {
         if (typeof showAddProductModal === 'function') {
           await showAddProductModal();
+          
           setTimeout(() => {
             const barcodeInput = document.getElementById('addProductSku');
             if (barcodeInput) {
@@ -796,6 +880,7 @@ class BarcodeScanner {
           }, 500);
         }
       }, 300);
+      
     } catch (err) {
       console.error('Error in handleAddItem:', err);
       this.showToast('Error: ' + err.message, 'error');
@@ -803,19 +888,27 @@ class BarcodeScanner {
   }
 
   async handleCheckStock(barcode) {
-    console.log('handleCheckStock:', barcode);
+    console.log('handleCheckStock called with barcode:', barcode);
     
     try {
       const response = await fetch(`/api/products?search=${encodeURIComponent(barcode)}`);
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
       
       const data = await response.json();
       let products = [];
-      if (Array.isArray(data)) products = data;
-      else if (data.products) products = data.products;
-      else if (data.data) products = data.data;
+      if (Array.isArray(data)) {
+        products = data;
+      } else if (data.products && Array.isArray(data.products)) {
+        products = data.products;
+      } else if (data.data && Array.isArray(data.data)) {
+        products = data.data;
+      }
       
       const product = products.find(p => p.sku === barcode || p.barcode === barcode);
+      
       if (!product) {
         this.showToast('Product not found!', 'error');
         return;
@@ -823,14 +916,20 @@ class BarcodeScanner {
 
       this.showToast(`Found: ${product.name}`, 'success');
       
+      // Navigate to product detail modal
       if (typeof showProducts === 'function') {
         showProducts();
+        
         setTimeout(() => {
           if (typeof showProductDetails === 'function') {
             showProductDetails(product.id);
+          } else {
+            console.error('showProductDetails function not found');
+            this.showToast('Error opening product details', 'error');
           }
         }, 800);
       }
+      
     } catch (err) {
       console.error('Error in handleCheckStock:', err);
       this.showToast('Error: ' + err.message, 'error');
@@ -838,67 +937,97 @@ class BarcodeScanner {
   }
 
   async handleAdjustStock(barcode) {
-    console.log('handleAdjustStock:', barcode);
+    console.log('handleAdjustStock called with barcode:', barcode);
     
     try {
       const response = await fetch(`/api/products?search=${encodeURIComponent(barcode)}`);
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
       
       const data = await response.json();
       let products = [];
-      if (Array.isArray(data)) products = data;
-      else if (data.products) products = data.products;
-      else if (data.data) products = data.data;
+      if (Array.isArray(data)) {
+        products = data;
+      } else if (data.products && Array.isArray(data.products)) {
+        products = data.products;
+      } else if (data.data && Array.isArray(data.data)) {
+        products = data.data;
+      }
       
       const product = products.find(p => p.sku === barcode || p.barcode === barcode);
+      
       if (!product) {
         this.showToast('Product not found!', 'error');
         return;
       }
 
+      // Get existing batches
       const batchResponse = await fetch(`/api/products/${product.id}/batches`);
       const batchData = await batchResponse.json();
       const batches = batchData.batches || [];
       
+      // Ask for expiration date using DATE PICKER
       const expiryDateInput = await this.showDateModal(
         'Adjust Stock',
         `Product: ${product.name}\n\nSelect expiration date:`
       );
       
       if (!expiryDateInput) {
-        this.showToast('Cancelled', 'info');
+        this.showToast('Adjustment cancelled', 'info');
         return;
       }
       
+      // Fixed date normalization - use the input value directly
       const targetDate = expiryDateInput;
+      console.log('Target date:', targetDate);
+      
       const normalizeDate = (val) => {
         if (!val) return null;
-        if (typeof val === 'string' && val.match(/^\d{4}-\d{2}-\d{2}$/)) return val;
+        // If already in YYYY-MM-DD format, return as-is
+        if (typeof val === 'string' && val.match(/^\d{4}-\d{2}-\d{2}$/)) {
+          return val;
+        }
+        // Otherwise parse and format
         const date = new Date(val);
-        if (isNaN(date.getTime())) return null;
-        return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+        if (isNaN(date.getTime())) {
+          console.error('Invalid date:', val);
+          return null;
+        }
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
       };
       
-      const matchingBatch = batches.find(b => normalizeDate(b.expiry_date) === targetDate);
+      // Check if batch with this date exists (compare only date part)
+      const matchingBatch = batches.find(b => {
+        const batchDate = normalizeDate(b.expiry_date);
+        console.log('Comparing batch date:', b.expiry_date, '→', batchDate, 'with target:', targetDate);
+        return batchDate === targetDate;
+      });
       
       if (matchingBatch) {
+        // Batch exists - adjust it
         const newQty = await this.showInputModal(
           'Adjust Batch',
-          `Batch found with expiry ${targetDate}\nCurrent: ${matchingBatch.quantity}\n\nEnter new quantity:`,
+          `Batch found with expiry ${targetDate}\nCurrent quantity: ${matchingBatch.quantity}\n\nEnter new quantity:`,
           'Quantity'
         );
         
         if (newQty === null) {
-          this.showToast('Cancelled', 'info');
+          this.showToast('Adjustment cancelled', 'info');
           return;
         }
         
         const reason = await this.showInputModal(
           'Adjustment Reason',
-          'Reason:',
+          'Reason for adjustment:',
           'e.g., Inventory count'
         );
         
+        // Call adjust API
         const adjustResponse = await fetch('/api/stock/adjust', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -906,19 +1035,20 @@ class BarcodeScanner {
             batch_id: matchingBatch.id,
             quantity: parseInt(newQty, 10),
             reason: reason || 'Inventory count',
-            notes: `Scanned: ${barcode}`
+            notes: `Scanned barcode: ${barcode}`
           })
         });
         
         if (adjustResponse.ok) {
           this.showToast(`✓ Adjusted: ${product.name}`, 'success');
         } else {
-          throw new Error('Failed to adjust');
+          throw new Error('Failed to adjust stock');
         }
       } else {
+        // No batch with this date - create new batch
         const qty = await this.showInputModal(
           'Create New Batch',
-          `No batch with ${targetDate}\n\nEnter quantity:`,
+          `No batch found with expiry ${targetDate}\n\nEnter quantity for new batch:`,
           'Quantity'
         );
         
@@ -927,22 +1057,24 @@ class BarcodeScanner {
           return;
         }
         
+        // Create new batch
         const createResponse = await fetch(`/api/products/${product.id}/batches`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             quantity: parseInt(qty, 10),
             expiration_date: targetDate,
-            notes: `Scanned: ${barcode}`
+            notes: `Created via scan - Barcode: ${barcode}`
           })
         });
         
         if (createResponse.ok) {
-          this.showToast(`✓ Created: ${product.name}`, 'success');
+          this.showToast(`✓ New batch created: ${product.name}`, 'success');
         } else {
-          throw new Error('Failed to create');
+          throw new Error('Failed to create batch');
         }
       }
+      
     } catch (err) {
       console.error('Error in handleAdjustStock:', err);
       this.showToast('Error: ' + err.message, 'error');
@@ -950,27 +1082,36 @@ class BarcodeScanner {
   }
 
   async handleDiscardItem(barcode) {
-    console.log('handleDiscardItem:', barcode);
+    console.log('handleDiscardItem called with barcode:', barcode);
     
     try {
       const response = await fetch(`/api/products?search=${encodeURIComponent(barcode)}`);
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
       
       const data = await response.json();
       let products = [];
-      if (Array.isArray(data)) products = data;
-      else if (data.products) products = data.products;
-      else if (data.data) products = data.data;
+      if (Array.isArray(data)) {
+        products = data;
+      } else if (data.products && Array.isArray(data.products)) {
+        products = data.products;
+      } else if (data.data && Array.isArray(data.data)) {
+        products = data.data;
+      }
       
       const product = products.find(p => p.sku === barcode || p.barcode === barcode);
+      
       if (!product) {
         this.showToast('Product not found!', 'error');
         return;
       }
 
+      // Ask if expired or damaged using BUTTON SELECTOR
       const reason = await this.showButtonModal(
         'Discard Reason',
-        `Product: ${product.name}\n\nWhy discard?`,
+        `Product: ${product.name}\n\nWhy are you discarding this item?`,
         [
           { label: '📅 Expired', value: '1', style: 'danger' },
           { label: '⚠️ Damaged', value: '2', style: 'warning' }
@@ -978,48 +1119,71 @@ class BarcodeScanner {
       );
       
       if (!reason) {
-        this.showToast('Cancelled', 'info');
+        this.showToast('Discard cancelled', 'info');
         return;
       }
       
       const reasonText = reason === '1' ? 'Expired' : 'Damaged';
       
+      // Ask for date using DATE PICKER
       const expiryDateInput = await this.showDateModal(
         'Discard Date',
         `Select ${reasonText.toLowerCase()} date:`
       );
       
       if (!expiryDateInput) {
-        this.showToast('Cancelled', 'info');
+        this.showToast('Discard cancelled', 'info');
         return;
       }
       
+      // Fixed date normalization - use the input value directly
       const targetDate = expiryDateInput;
+      console.log('Target date:', targetDate);
+      
       const normalizeDate = (val) => {
         if (!val) return null;
-        if (typeof val === 'string' && val.match(/^\d{4}-\d{2}-\d{2}$/)) return val;
+        // If already in YYYY-MM-DD format, return as-is
+        if (typeof val === 'string' && val.match(/^\d{4}-\d{2}-\d{2}$/)) {
+          return val;
+        }
+        // Otherwise parse and format
         const date = new Date(val);
-        if (isNaN(date.getTime())) return null;
-        return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+        if (isNaN(date.getTime())) {
+          console.error('Invalid date:', val);
+          return null;
+        }
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
       };
       
+      // Get existing batches
       const batchResponse = await fetch(`/api/products/${product.id}/batches`);
       const batchData = await batchResponse.json();
       const batches = batchData.batches || [];
-      const matchingBatch = batches.find(b => normalizeDate(b.expiry_date) === targetDate);
+      
+      // Find batch with matching date (compare only date part)
+      const matchingBatch = batches.find(b => {
+        const batchDate = normalizeDate(b.expiry_date);
+        console.log('Comparing batch date:', b.expiry_date, '→', batchDate, 'with target:', targetDate);
+        return batchDate === targetDate;
+      });
       
       if (matchingBatch) {
+        // Batch exists - discard from it
         const qty = await this.showInputModal(
           'Discard Quantity',
-          `Batch: ${targetDate}\nCurrent: ${matchingBatch.quantity}\n\nDiscard qty:`,
+          `Batch found with date ${targetDate}\nCurrent quantity: ${matchingBatch.quantity}\n\nEnter quantity to discard:`,
           'Quantity'
         );
         
         if (qty === null) {
-          this.showToast('Cancelled', 'info');
+          this.showToast('Discard cancelled', 'info');
           return;
         }
         
+        // Call discard API
         const discardResponse = await fetch('/api/stock/discard', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -1027,19 +1191,20 @@ class BarcodeScanner {
             batch_id: matchingBatch.id,
             quantity: parseInt(qty, 10),
             reason: reasonText,
-            notes: `Scanned: ${barcode}`
+            notes: `Scanned barcode: ${barcode}`
           })
         });
         
         if (discardResponse.ok) {
           this.showToast(`✓ Discarded ${qty} x ${product.name}`, 'success');
         } else {
-          throw new Error('Failed to discard');
+          throw new Error('Failed to discard stock');
         }
       } else {
+        // No batch found - create negative batch for tracking
         const qty = await this.showInputModal(
-          'Track Discarded',
-          `No batch ${targetDate}\n\nEnter discarded qty:`,
+          'Track Discarded Items',
+          `No batch with date ${targetDate}\n\nThis will create a negative batch for tracking.\n\nEnter quantity discarded:`,
           'Quantity'
         );
         
@@ -1048,13 +1213,14 @@ class BarcodeScanner {
           return;
         }
         
+        // Create batch with negative quantity
         const createResponse = await fetch(`/api/products/${product.id}/batches`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             quantity: -parseInt(qty, 10),
             expiration_date: targetDate,
-            notes: `${reasonText} - ${barcode}`,
+            notes: `${reasonText} - Never logged. Barcode: ${barcode}`,
             batch_number: `DISCARD-${Date.now()}`
           })
         });
@@ -1062,9 +1228,10 @@ class BarcodeScanner {
         if (createResponse.ok) {
           this.showToast(`✓ Tracked: -${qty} ${product.name}`, 'success');
         } else {
-          throw new Error('Failed to track');
+          throw new Error('Failed to create discard record');
         }
       }
+      
     } catch (err) {
       console.error('Error in handleDiscardItem:', err);
       this.showToast('Error: ' + err.message, 'error');
@@ -1072,13 +1239,13 @@ class BarcodeScanner {
   }
 }
 
-// Initialize
+// Initialize scanner when DOM is ready
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', () => {
-    console.log('✅ Initializing ZXing barcode scanner...');
+    console.log('Initializing barcode scanner...');
     window.barcodeScanner = new BarcodeScanner();
   });
 } else {
-  console.log('✅ Initializing ZXing barcode scanner...');
+  console.log('Initializing barcode scanner...');
   window.barcodeScanner = new BarcodeScanner();
 }
