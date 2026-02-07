@@ -1,5 +1,22 @@
 const API_URL = '/api';
 
+// Defensive fetch wrapper to ensure API URLs always have /api/ prefix
+const originalFetch = window.fetch.bind(window);
+window.safeFetch = (url, options = {}) => {
+    // Ensure URL has /api/ prefix if it's a relative API call
+    if (typeof url === 'string' && !url.startsWith('http') && !url.startsWith('/api/') && !url.startsWith('/')) {
+        console.warn(`⚠️ URL missing /api/ prefix, correcting: ${url}`);
+        url = `/api/${url}`;
+    }
+    return originalFetch(url, options);
+};
+
+// Override fetch temporarily (performance.js may override it again later)
+if (!window.fetch._originalFetch) {
+    window.fetch._originalFetch = window.fetch;
+}
+window.fetch = window.safeFetch;
+
 // Global data storage
 let allStockData = [];
 let currentProduct = null;
